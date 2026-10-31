@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Nouvelle facture — LIBFAD{% endblock %}
+{% block heading %}Nouvelle facture{% endblock %}
+{% block content %}
+<form method="post" action="/api/invoices/form" class="card card-pad space-y-6 max-w-5xl"
+      x-data="{
+        items: [{ qty: 1, pu: 0, tva: 20 }],
+        get totalHT() { return this.items.reduce((s, i) => s + (Number(i.qty)||0) * (Number(i.pu)||0), 0); },
+        get totalTVA() { return this.items.reduce((s, i) => s + (Number(i.qty)||0) * (Number(i.pu)||0) * ((Number(i.tva)||0)/100), 0); },
+        get totalTTC() { return this.totalHT + this.totalTVA; },
+        fmt(n) { return new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0); }
+      }">
+  <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div>
+      <label class="label">Client *</label>
+      <select name="client_id" required class="select">
+        <option value="">Choisir un client…</option>
+        {% for c in clients %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+      </select>
+    </div>
+    <div>
+      <label class="label">Date d'émission</label>
+      <input type="date" name="issue_date" class="input" />
+    </div>
+    <div>
+      <label class="label">Délai paiement (jours)</label>
+      <input type="number" name="payment_terms_days" value="30" class="input" />
+    </div>
+    <div>
+      <label class="label">Date d'échéance</label>
+      <input type="date" name="due_date" class="input" />
+    </div>
+    <div>
+      <label class="label">Devise</label>
+      <select name="currency" class="select"><option>EUR</option><option>MAD</option><option>USD</option></select>
+    </div>
+    <div>
+      <label class="label">Langue du PDF</label>
+      <select name="locale" class="select">
+        <option value="fr_FR" {% if (default_locale or 'fr_FR').startswith('fr') %}selected{% endif %}>Français</option>
+        <option value="en_US" {% if (default_locale or '').startswith('en') %}selected{% endif %}>English</option>
+      </select>
+    </div>
+    <div>
+      <label class="label">Compte d'encaissement</label>
+      <select name="bank_account_id" class="select">
+        <option value="">— Aucun —</option>
+        {% for a in bank_accounts %}<option value="{{ a.id }}" {% if default_bank and a.id == default_bank %}selected{% endif %}>{{ a.name }}{% if a.bank_name %} ({{ a.bank_name }}){% endif %}</option>{% endfor %}
+      </select>
+    </div>
+  </div>
+
+  <div>
+    <div class="flex items-center justify-between mb-3">
+      <h3 class="font-semibold">Lignes de facture</h3>
+      <button type="button" @click="items.push({ qty: 1, pu: 0, tva: 20 })" class="btn btn-outline btn-sm">+ Ajouter une ligne</button>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="text-xs muted uppercase tracking-wide">
+            <th class="text-left py-1 font-semibold">Description</th>
+            <th class="w-24 font-semibold">Qté</th>
+            <th class="w-36 font-semibold">Prix unit. HT</th>
+            <th class="w-24 font-semibold">TVA %</th>
+            <th class="w-28 font-semibold text-right">Total HT</th>
+            <th class="w-8"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="(item, idx) in items" :key="idx">
+            <tr>
+              <td class="pr-2 py-1"><input name="descriptions" x-model="item.description" required class="input" /></td>
+              <td class="px-1"><input name="quantities" type="number" step="0.01" x-model.number="item.qty" class="input" /></td>
+              <td class="px-1"><input name="unit_prices" type="number" step="0.01" x-model.number="item.pu" class="input" /></td>
+              <td class="px-1"><input name="tax_rates" type="number" step="0.01" x-model.number="item.tva" class="input" /></td>
+              <td class="px-1 text-right font-medium tabular-nums" x-text="fmt((Number(item.qty)||0)*(Number(item.pu)||0))"></td>
+              <td class="text-center"><button type="button" @click="items.splice(idx,1)" class="btn btn-ghost btn-icon text-red-500">×</button></td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Totaux en direct -->
+    <div class="flex justify-end mt-4">
+      <div class="w-full sm:w-72 space-y-1.5 text-sm">
+        <div class="flex justify-between"><span class="muted">Total HT</span><span class="font-medium tabular-nums" x-text="fmt(totalHT)"></span></div>
+        <div class="flex justify-between"><span class="muted">TVA</span><span class="font-medium tabular-nums" x-text="fmt(totalTVA)"></span></div>
+        <div class="flex justify-between text-base font-bold pt-1.5 border-t" style="border-color:var(--border)"><span>Total TTC</span><span class="tabular-nums" x-text="fmt(totalTTC)"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <label class="label">Notes / Conditions</label>
+    <textarea name="notes_public" rows="3" class="textarea"></textarea>
+  </div>
+
+  <div class="flex justify-end gap-2">
+    <a href="/invoices" class="btn btn-outline">Annuler</a>
+    <button type="submit" class="btn btn-primary">Créer la facture</button>
+  </div>
+</form>
+{% endblock %}

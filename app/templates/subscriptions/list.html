@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Abonnements — LIBFAD{% endblock %}
+{% block heading %}Abonnements récurrents{% endblock %}
+{% block header_extra %}
+<button x-data @click="$dispatch('open-sub-modal')" class="btn btn-primary btn-sm">+ Nouvel abonnement</button>
+{% endblock %}
+
+{% block content %}
+{% from "components/ui.html" import page_header %}
+{{ page_header('Revenus récurrents', 'Automatisez la création des factures liées à vos abonnements.', 'repeat-2') }}
+{% set period_label = {'weekly':'Hebdo','monthly':'Mensuel','quarterly':'Trimestriel','yearly':'Annuel'} %}
+<div class="card">
+  <div class="overflow-x-auto">
+    <table class="app-table" data-smart data-page-size="15">
+      <thead>
+        <tr>
+          <th>Nom</th><th>Client</th><th>Périodicité</th><th class="text-right">Montant HT</th><th>Prochaine facture</th><th class="text-center">Actif</th><th class="text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for s in subscriptions %}
+        <tr>
+          <td class="font-medium">{{ s.name }}</td>
+          <td>
+            {% set c = clients.get(s.client_id) %}
+            {% if c %}<a href="/clients/{{ c.id }}" class="text-brand-600 dark:text-brand-400 hover:underline">{{ c.name }}</a>{% else %}<span class="muted">—</span>{% endif %}
+          </td>
+          <td class="muted">{{ period_label.get(s.period, s.period) }}{% if s.interval and s.interval > 1 %} ×{{ s.interval }}{% endif %}</td>
+          <td class="text-right font-medium">{{ s.amount_ht | round(2) }} {{ s.currency }}</td>
+          <td class="muted">{{ s.next_billing_date.strftime('%d/%m/%Y') if s.next_billing_date else '—' }}</td>
+          <td class="text-center">
+            {% if s.is_active %}<span class="badge badge-green">Actif</span>{% else %}<span class="badge badge-slate">Inactif</span>{% endif %}
+          </td>
+          <td class="text-right">
+            <form method="post" action="/api/subscriptions/{{ s.id }}/delete-form" onsubmit="return confirm('Supprimer cet abonnement ?');" class="inline">
+              <button type="submit" class="btn btn-ghost btn-sm text-red-500">Supprimer</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="empty">Aucun abonnement. Créez votre premier abonnement récurrent.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div x-data="{ open: false }" x-cloak @open-sub-modal.window="open = true" x-show="open" class="modal-backdrop" @keydown.escape.window="open = false">
+  <div class="modal-panel max-w-2xl p-6" @click.outside="open = false">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-lg font-semibold">Nouvel abonnement</h2>
+      <button @click="open = false" class="btn btn-ghost btn-icon">&times;</button>
+    </div>
+    <form method="post" action="/api/subscriptions/form" class="grid grid-cols-2 gap-4">
+      <div class="col-span-2"><label class="label">Nom *</label><input name="name" required class="input" /></div>
+      <div><label class="label">Client *</label>
+        <select name="client_id" required class="select">
+          <option value="">— Sélectionner —</option>
+          {% for c in client_list %}<option value="{{ c.id }}">{{ c.name }}</option>{% endfor %}
+        </select></div>
+      <div><label class="label">Produit lié</label>
+        <select name="product_id" class="select">
+          <option value="">— Aucun —</option>
+          {% for p in products %}<option value="{{ p.id }}">{{ p.name }}</option>{% endfor %}
+        </select></div>
+      <div><label class="label">Périodicité</label>
+        <select name="period" class="select">
+          <option value="weekly">Hebdomadaire</option><option value="monthly" selected>Mensuel</option><option value="quarterly">Trimestriel</option><option value="yearly">Annuel</option>
+        </select></div>
+      <div><label class="label">Intervalle (toutes les N périodes)</label><input name="interval" type="number" min="1" value="1" class="input" /></div>
+      <div><label class="label">Montant HT *</label><input name="amount_ht" type="number" step="0.01" min="0" required class="input" /></div>
+      <div><label class="label">TVA (%)</label><input name="tax_rate" type="number" step="0.01" min="0" value="20" class="input" /></div>
+      <div><label class="label">Devise</label>
+        <select name="currency" class="select"><option>EUR</option><option>MAD</option><option>USD</option></select></div>
+      <div><label class="label">Date de début</label><input name="start_date" type="date" class="input" /></div>
+      <div><label class="label">Date de fin</label><input name="end_date" type="date" class="input" /></div>
+      <div class="col-span-2 flex items-center gap-2">
+        <input id="auto_send" name="auto_send" type="checkbox" value="true" checked class="rounded" />
+        <label for="auto_send" class="label mb-0">Envoyer automatiquement les factures</label>
+      </div>
+      <div class="col-span-2 flex justify-end gap-2 mt-2">
+        <button type="button" @click="open = false" class="btn btn-outline">Annuler</button>
+        <button type="submit" class="btn btn-primary">Créer</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

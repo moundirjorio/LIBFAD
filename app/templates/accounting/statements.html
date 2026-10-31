@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}États de synthèse — LIBFAD{% endblock %}
+{% block heading %}États de synthèse{% endblock %}
+{% macro money(v) %}{{ '{:,.2f}'.format(v|float).replace(',', ' ').replace('.', ',') }}{% endmacro %}
+{% block content %}
+{% set cpc = fs.cpc %}{% set b = fs.bilan %}
+
+<!-- CPC -->
+<div class="card mb-6">
+  <div class="card-header"><h2 class="font-semibold">Compte de produits et charges (CPC)</h2>
+    <span class="badge {{ 'badge-green' if cpc.resultat >= 0 else 'badge-red' }}">
+      Résultat {{ 'bénéfice' if cpc.resultat >= 0 else 'perte' }} : {{ money(cpc.resultat) }} MAD</span>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-0">
+    <div class="p-5 md:border-r" style="border-color:var(--line)">
+      <p class="stat-label mb-2">Produits</p>
+      <table class="w-full text-sm">
+        {% for p in cpc.produits %}<tr><td class="py-1"><b>{{ p.code }}</b> <span class="muted">{{ p.label }}</span></td><td class="text-right font-semibold">{{ money(p.amount) }}</td></tr>{% endfor %}
+        {% if not cpc.produits %}<tr><td class="muted py-1">Aucun produit.</td></tr>{% endif %}
+        <tr style="border-top:1px solid var(--line)"><td class="pt-2 font-bold">Total produits</td><td class="text-right pt-2 font-bold">{{ money(cpc.total_produits) }}</td></tr>
+      </table>
+    </div>
+    <div class="p-5">
+      <p class="stat-label mb-2">Charges</p>
+      <table class="w-full text-sm">
+        {% for c in cpc.charges %}<tr><td class="py-1"><b>{{ c.code }}</b> <span class="muted">{{ c.label }}</span></td><td class="text-right font-semibold">{{ money(c.amount) }}</td></tr>{% endfor %}
+        {% if not cpc.charges %}<tr><td class="muted py-1">Aucune charge.</td></tr>{% endif %}
+        <tr style="border-top:1px solid var(--line)"><td class="pt-2 font-bold">Total charges</td><td class="text-right pt-2 font-bold">{{ money(cpc.total_charges) }}</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- BILAN -->
+{% set names = {'immobilise':'Actif immobilisé','circulant_actif':'Actif circulant','tresorerie_actif':'Trésorerie – Actif','financement':'Financement permanent','circulant_passif':'Passif circulant','tresorerie_passif':'Trésorerie – Passif'} %}
+<div class="card">
+  <div class="card-header"><h2 class="font-semibold">Bilan</h2>
+    {% if b.balanced %}<span class="badge badge-green"><i data-lucide="check" style="width:.85rem;height:.85rem"></i> Équilibré</span>
+    {% else %}<span class="badge badge-red">Déséquilibré</span>{% endif %}
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-0">
+    <!-- ACTIF -->
+    <div class="p-5 md:border-r" style="border-color:var(--line)">
+      <p class="stat-label mb-3">ACTIF</p>
+      {% for key in ['immobilise','circulant_actif','tresorerie_actif'] %}
+        {% if b.groups[key] %}
+        <p class="text-xs font-bold uppercase muted mt-3 mb-1">{{ names[key] }}</p>
+        <table class="w-full text-sm">
+          {% for i in b.groups[key] %}<tr><td class="py-1"><b>{{ i.code }}</b> <span class="muted">{{ i.label }}</span></td><td class="text-right">{{ money(i.amount) }}</td></tr>{% endfor %}
+        </table>
+        {% endif %}
+      {% endfor %}
+      {% if cpc.resultat < 0 %}<p class="text-xs font-bold uppercase muted mt-3 mb-1">Résultat</p><table class="w-full text-sm"><tr><td class="py-1">Perte de l'exercice</td><td class="text-right">{{ money(-cpc.resultat) }}</td></tr></table>{% endif %}
+      <div class="flex justify-between pt-3 mt-3 border-t font-bold" style="border-color:var(--line-strong)"><span>TOTAL ACTIF</span><span>{{ money(b.total_actif) }} MAD</span></div>
+    </div>
+    <!-- PASSIF -->
+    <div class="p-5">
+      <p class="stat-label mb-3">PASSIF</p>
+      {% for key in ['financement','circulant_passif','tresorerie_passif'] %}
+        {% if b.groups[key] %}
+        <p class="text-xs font-bold uppercase muted mt-3 mb-1">{{ names[key] }}</p>
+        <table class="w-full text-sm">
+          {% for i in b.groups[key] %}<tr><td class="py-1"><b>{{ i.code }}</b> <span class="muted">{{ i.label }}</span></td><td class="text-right">{{ money(i.amount) }}</td></tr>{% endfor %}
+        </table>
+        {% endif %}
+      {% endfor %}
+      {% if cpc.resultat >= 0 %}<p class="text-xs font-bold uppercase muted mt-3 mb-1">Résultat</p><table class="w-full text-sm"><tr><td class="py-1">Résultat net (bénéfice)</td><td class="text-right">{{ money(cpc.resultat) }}</td></tr></table>{% endif %}
+      <div class="flex justify-between pt-3 mt-3 border-t font-bold" style="border-color:var(--line-strong)"><span>TOTAL PASSIF</span><span>{{ money(b.total_passif) }} MAD</span></div>
+    </div>
+  </div>
+</div>
+{% endblock %}

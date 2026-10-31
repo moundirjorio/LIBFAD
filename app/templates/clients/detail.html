@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% block title %}{{ client.name }} — LIBFAD{% endblock %}
+{% block heading %}{{ client.name }}{% endblock %}
+{% block header_extra %}
+<button class="btn btn-outline btn-sm" onclick="recalcSolvency(this, {{ client.id }})">↻ Recalculer le score</button>
+<a href="/invoices/new?client_id={{ client.id }}" class="btn btn-primary btn-sm">+ Facture</a>
+{% endblock %}
+
+{% block content %}
+{% set status_color = {'paid':'green','overdue':'red','sent':'blue','draft':'slate','issued':'indigo','partially_paid':'amber','cancelled':'rose'} %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-1 space-y-4">
+    {% if unpaid_invoices %}
+    <div class="card card-pad" style="border-left:4px solid #f59e0b">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="font-semibold">Impayés</h3>
+        <span class="badge badge-amber">{{ unpaid_invoices | length }}</span>
+      </div>
+      {% set due_ccy = unpaid_invoices[0].currency %}
+      <div class="text-2xl font-extrabold text-amber-600 dark:text-amber-400">{{ total_due | round(2) }} {{ due_ccy }}</div>
+      <p class="text-xs muted mt-1 mb-3">restant à encaisser sur {{ unpaid_invoices | length }} facture(s)</p>
+      {% if wa_number %}
+        {% set ns = namespace(txt="Bonjour, voici le récapitulatif de vos factures en attente de règlement :\n") %}
+        {% for inv in unpaid_invoices %}{% set ns.txt = ns.txt ~ "- Facture " ~ inv.number ~ " : " ~ (inv.amount_due | round(2)) ~ " " ~ inv.currency ~ " (échéance " ~ inv.due_date.strftime('%d/%m/%Y') ~ ")\n" %}{% endfor %}
+        {% set ns.txt = ns.txt ~ "Total restant dû : " ~ (total_due | round(2)) ~ " " ~ due_ccy ~ ".\nMerci d'avance pour votre règlement. Cordialement, " ~ (current_user.full_name or settings.app_name) ~ "." %}
+        <a href="https://wa.me/{{ wa_number }}?text={{ ns.txt | urlencode }}" target="_blank" rel="noopener"
+           class="btn btn-sm w-full" style="background:#128C7E;color:#fff" title="Envoyer le récapitulatif des impayés par WhatsApp">
+          <i data-lucide="message-circle"></i> Relancer par WhatsApp
+        </a>
+      {% else %}
+        <p class="text-xs muted">Ajoutez un téléphone à ce client pour activer la relance WhatsApp.</p>
+      {% endif %}
+    </div>
+    {% endif %}
+    <div class="card card-pad">
+      <h3 class="font-semibold mb-3">Coordonnées</h3>
+      <dl class="text-sm space-y-1">
+        <dt class="muted">Email</dt><dd>{{ client.email or '—' }}</dd>
+        <dt class="muted mt-2">Téléphone</dt><dd>{{ client.phone or '—' }}</dd>
+        <dt class="muted mt-2">Adresse</dt>
+        <dd>
+          {{ client.billing_address_line1 or '' }}<br>
+          {{ client.billing_postal_code or '' }} {{ client.billing_city or '' }}<br>
+          {{ client.billing_country or '' }}
+        </dd>
+        {% if client.siret %}<dt class="muted mt-2">SIRET</dt><dd>{{ client.siret }}</dd>{% endif %}
+        {% if client.vat_number %}<dt class="muted mt-2">TVA</dt><dd>{{ client.vat_number }}</dd>{% endif %}
+        {% if client.ice %}<dt class="muted mt-2">ICE</dt><dd>{{ client.ice }}</dd>{% endif %}
+      </dl>
+    </div>
+    <div class="card card-pad">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold">Accès espace client</h3>
+        {% if portal_user %}
+          <span class="badge badge-{{ 'green' if portal_user.is_active else 'slate' }}">{{ 'Actif' if portal_user.is_active else 'Désactivé' }}</span>
+        {% else %}
+          <span class="badge badge-slate">Aucun</span>
+        {% endif %}
+      </div>
+      {% if portal_user %}
+        <dl class="text-sm space-y-1 mb-3">
+          <dt class="muted">Identifiant</dt><dd>{{ portal_user.email }}</dd>
+          <dt class="muted mt-2">Dernière connexion</dt><dd>{{ portal_user.last_login_at.strftime('%d/%m/%Y %H:%M') if portal_user.last_login_at else 'Jamais' }}</dd>
+        </dl>
+        <div class="flex flex-wrap gap-2">
+          <button class="btn btn-outline btn-sm" onclick="portalAccess(this, {{ client.id }})">↻ Réinitialiser le mot de passe</button>
+          <button class="btn btn-ghost btn-sm" onclick="togglePortal(this, {{ client.id }})">{{ 'Désactiver' if portal_user.is_active else 'Réactiver' }}</button>
+        </div>
+      {% else %}
+        <p class="muted text-sm mb-3">Donnez à ce client l'accès à son espace pour consulter ses factures et devis.</p>
+        <button class="btn btn-primary btn-sm w-full" onclick="portalAccess(this, {{ client.id }})">Créer un accès client</button>
+      {% endif %}
+    </div>
+
+    <div class="card card-pad">
+      <h3 class="font-semibold mb-3">Score de solvabilité</h3>
+      {% if client.solvency_score is not none %}
+        {% set color = 'green' if client.solvency_score >= 75 else ('amber' if client.solvency_score >= 45 else 'red') %}
+        <div class="text-4xl font-bold text-{{color}}-500">{{ client.solvency_score }}<span class="text-xl muted">/100</span></div>
+        <p class="text-xs muted mt-1">Niveau de risque : {{ client.risk_level }}</p>
+      {% else %}
+        <p class="muted text-sm">Pas encore calculé. Cliquez sur « Recalculer ».</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="lg:col-span-2 card">
+    <div class="card-header"><h3>Historique des factures</h3></div>
+    <div class="overflow-x-auto">
+      <table class="app-table">
+        <thead>
+          <tr><th>N°</th><th>Date</th><th>Statut</th><th class="text-right">TTC</th><th class="text-right">Dû</th></tr>
+        </thead>
+        <tbody>
+        {% for inv in invoices %}
+          <tr>
+            <td><a href="/invoices/{{ inv.id }}" class="text-brand-600 dark:text-brand-400 hover:underline">{{ inv.number }}</a></td>
+            <td class="muted">{{ inv.issue_date.strftime('%d/%m/%Y') }}</td>
+            <td><span class="badge badge-{{ status_color.get(inv.status, 'slate') }}">{{ inv.status }}</span></td>
+            <td class="text-right">{{ inv.total_ttc | round(2) }} {{ inv.currency }}</td>
+            <td class="text-right {% if inv.amount_due > 0 %}text-amber-600 dark:text-amber-400 font-semibold{% else %}muted{% endif %}">{{ inv.amount_due | round(2) }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="empty">Aucune facture pour ce client.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function recalcSolvency(btn, id) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ Calcul…';
+  try {
+    const res = await fetch(`/api/clients/${id}/solvency`, { method: 'POST', headers: { 'Accept': 'application/json' } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || ('Erreur ' + res.status));
+    window.toast('Score recalculé.', 'success');
+    setTimeout(() => window.location.reload(), 900);
+  } catch (e) {
+    window.toast('Échec du calcul : ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+async function portalAccess(btn, id) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳…';
+  try {
+    const res = await fetch(`/api/clients/${id}/portal-access`, { method: 'POST', headers: { 'Accept': 'application/json' } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || ('Erreur ' + res.status));
+    // On affiche les identifiants une seule fois (le mot de passe n'est pas stocké en clair).
+    window.prompt(
+      'Identifiants du client — à lui transmettre (le mot de passe ne sera plus affiché) :',
+      `Connexion : ${data.login_url}\nEmail : ${data.email}\nMot de passe : ${data.password}`
+    );
+    const acc = data.action === 'created' ? 'créé' : 'réinitialisé';
+    window.toast('Accès ' + acc + (data.emailed ? ' — identifiants envoyés par email.' : '.'), 'success');
+    setTimeout(() => window.location.reload(), 800);
+  } catch (e) {
+    window.toast('Échec : ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+async function togglePortal(btn, id) {
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/clients/${id}/portal-access/toggle`, { method: 'POST', headers: { 'Accept': 'application/json' } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || ('Erreur ' + res.status));
+    window.toast(data.is_active ? 'Accès réactivé.' : 'Accès désactivé.', 'success');
+    setTimeout(() => window.location.reload(), 700);
+  } catch (e) {
+    window.toast('Échec : ' + e.message, 'error');
+    btn.disabled = false;
+  }
+}
+</script>
+{% endblock %}

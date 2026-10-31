@@ -1,0 +1,89 @@
+{% extends "portal/base.html" %}
+{% block title %}Facture {{ invoice.number }} — Espace client{% endblock %}
+{% set status_label = {'paid':'Payée','overdue':'En retard','sent':'Envoyée','issued':'Émise','partially_paid':'Partiel','cancelled':'Annulée','refunded':'Remboursée'} %}
+{% set status_color = {'paid':'green','overdue':'red','sent':'blue','issued':'indigo','partially_paid':'amber','cancelled':'rose','refunded':'slate'} %}
+{% block content %}
+
+<div class="flex items-center justify-between gap-3 mb-6 flex-wrap">
+  <div>
+    <a href="/portail/factures" class="text-sm muted hover:underline inline-flex items-center gap-1"><i data-lucide="arrow-left"></i> Retour aux factures</a>
+    <h2 class="mt-1" style="font-family:'Manrope',sans-serif; font-size:1.5rem; font-weight:750; letter-spacing:-.03em;">Facture {{ invoice.number }}</h2>
+  </div>
+  <div class="flex items-center gap-2">
+    <span class="badge badge-{{ status_color.get(invoice.status, 'slate') }}">{{ status_label.get(invoice.status, invoice.status) }}</span>
+    {% if invoice.amount_due and invoice.amount_due > 0 and invoice.status not in ['cancelled', 'refunded'] %}
+    <a href="/portail/factures/{{ invoice.id }}/regler" class="btn btn-primary btn-sm"><i data-lucide="credit-card"></i> Régler cette facture</a>
+    {% endif %}
+    <a href="/portail/factures/{{ invoice.id }}/pdf" class="btn btn-outline btn-sm"><i data-lucide="download"></i> Télécharger le PDF</a>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  <div class="card card-pad">
+    <div class="stat-label">Total TTC</div>
+    <div class="text-2xl font-extrabold mt-1">{{ invoice.total_ttc | money(invoice.currency, client.locale) }}</div>
+  </div>
+  <div class="card card-pad">
+    <div class="stat-label">Déjà payé</div>
+    <div class="text-2xl font-extrabold mt-1 text-green-600">{{ invoice.amount_paid | money(invoice.currency, client.locale) }}</div>
+  </div>
+  <div class="card card-pad">
+    <div class="stat-label">Restant dû</div>
+    <div class="text-2xl font-extrabold mt-1 {% if invoice.amount_due and invoice.amount_due > 0 %}text-amber-600{% endif %}">{{ invoice.amount_due | money(invoice.currency, client.locale) }}</div>
+  </div>
+</div>
+
+<div class="card mb-6">
+  <div class="card-header"><h2 class="text-base font-semibold">Détail</h2>
+    <span class="text-sm muted">Émise le {{ invoice.issue_date | date_fr(client.locale) }} · Échéance {{ invoice.due_date | date_fr(client.locale) }}</span>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="app-table">
+      <thead>
+        <tr><th>Description</th><th class="text-right">Qté</th><th class="text-right">P.U. HT</th><th class="text-right">TVA</th><th class="text-right">Total TTC</th></tr>
+      </thead>
+      <tbody>
+        {% for it in invoice.items %}
+        <tr>
+          <td>{{ it.description }}</td>
+          <td class="text-right">{{ it.quantity | num(client.locale) }} {{ it.unit }}</td>
+          <td class="text-right">{{ it.unit_price | money(invoice.currency, client.locale) }}</td>
+          <td class="text-right">{{ it.tax_rate | num(client.locale) }} %</td>
+          <td class="text-right font-semibold">{{ it.line_total_ttc | money(invoice.currency, client.locale) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr><td colspan="4" class="text-right muted">Sous-total HT</td><td class="text-right">{{ invoice.subtotal_ht | money(invoice.currency, client.locale) }}</td></tr>
+        <tr><td colspan="4" class="text-right muted">TVA</td><td class="text-right">{{ invoice.total_tax | money(invoice.currency, client.locale) }}</td></tr>
+        <tr><td colspan="4" class="text-right font-bold">Total TTC</td><td class="text-right font-bold">{{ invoice.total_ttc | money(invoice.currency, client.locale) }}</td></tr>
+      </tfoot>
+    </table>
+  </div>
+  {% if invoice.notes_public %}
+  <div class="card-pad border-t" style="border-color:var(--border)"><p class="text-sm muted">{{ invoice.notes_public }}</p></div>
+  {% endif %}
+</div>
+
+{% if invoice.payments %}
+<div class="card">
+  <div class="card-header"><h2 class="text-base font-semibold">Paiements enregistrés</h2></div>
+  <div class="overflow-x-auto">
+    <table class="app-table">
+      <thead><tr><th>Date</th><th>Méthode</th><th>Référence</th><th class="text-right">Montant</th></tr></thead>
+      <tbody>
+        {% for p in invoice.payments %}
+        <tr>
+          <td>{{ p.paid_on | date_fr(client.locale, 'medium') }}</td>
+          <td>{{ p.method }}</td>
+          <td class="muted">{{ p.reference or '—' }}</td>
+          <td class="text-right font-semibold text-green-600">{{ p.amount | money(p.currency, client.locale) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

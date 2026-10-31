@@ -1,0 +1,63 @@
+{% extends "portal/base.html" %}
+{% block title %}Mon profil — Espace client{% endblock %}
+{% block content %}
+
+<div class="mb-6">
+  <p class="eyebrow">Mon compte</p>
+  <h2 style="font-family:'Manrope',sans-serif; font-size:1.55rem; font-weight:750; letter-spacing:-.035em;">Mes coordonnées</h2>
+</div>
+
+{% if request.query_params.get('ok') %}
+<div class="mb-5 p-3 rounded-xl text-sm border flex items-center gap-2" style="border-color:var(--border); background:var(--brand-soft); color:var(--brand-strong)">
+  <i data-lucide="check-circle-2"></i> Vos informations ont été enregistrées.
+</div>
+{% endif %}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="card card-pad">
+    <h3 class="font-semibold mb-3">Identité</h3>
+    <dl class="space-y-3 text-sm">
+      <div><dt class="muted text-xs uppercase tracking-wide">Raison sociale</dt><dd class="font-medium mt-.5">{{ client.name }}</dd></div>
+      {% if client.legal_name %}<div><dt class="muted text-xs uppercase tracking-wide">Nom légal</dt><dd class="font-medium">{{ client.legal_name }}</dd></div>{% endif %}
+      <div><dt class="muted text-xs uppercase tracking-wide">Email de connexion</dt><dd class="font-medium">{{ portal_user.email }}</dd></div>
+      {% if client.vat_number %}<div><dt class="muted text-xs uppercase tracking-wide">N° TVA</dt><dd class="font-medium">{{ client.vat_number }}</dd></div>{% endif %}
+      {% if client.siret %}<div><dt class="muted text-xs uppercase tracking-wide">SIRET</dt><dd class="font-medium">{{ client.siret }}</dd></div>{% endif %}
+    </dl>
+    <p class="text-xs muted mt-4">Pour modifier votre identité légale, contactez votre fournisseur.</p>
+  </div>
+
+  <div class="card card-pad lg:col-span-2">
+    <h3 class="font-semibold mb-4">Contact & adresse de facturation</h3>
+    <form method="post" action="/portail/profil" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="label">Téléphone</label>
+        <input name="phone" class="input" value="{{ client.phone or '' }}" placeholder="+33…" />
+      </div>
+      <div>
+        <label class="label">Site web</label>
+        <input name="website" class="input" value="{{ client.website or '' }}" placeholder="https://…" />
+      </div>
+      <div class="sm:col-span-2">
+        <label class="label">Adresse (ligne 1)</label>
+        <input name="billing_address_line1" class="input" value="{{ client.billing_address_line1 or '' }}" />
+      </div>
+      <div class="sm:col-span-2">
+        <label class="label">Adresse (ligne 2)</label>
+        <input name="billing_address_line2" class="input" value="{{ client.billing_address_line2 or '' }}" />
+      </div>
+      <div>
+        <label class="label">Code postal</label>
+        <input name="billing_postal_code" class="input" value="{{ client.billing_postal_code or '' }}" />
+      </div>
+      <div>
+        <label class="label">Ville</label>
+        <input name="billing_city" class="input" value="{{ client.billing_city or '' }}" />
+      </div>
+      <div class="sm:col-span-2 flex justify-end mt-2">
+        <button type="submit" class="btn btn-primary"><i data-lucide="save"></i> Enregistrer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

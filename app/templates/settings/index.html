@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Paramètres — LIBFAD{% endblock %}
+{% block heading %}Paramètres de l'entreprise{% endblock %}
+{% block content %}
+<div class="max-w-3xl space-y-6">
+
+<div class="card card-pad">
+  <h3 class="font-semibold mb-1">Identité visuelle</h3>
+  <p class="text-sm muted mb-4">Logo et couleur repris sur vos factures et devis PDF.</p>
+  <div class="flex flex-col sm:flex-row gap-6 items-start">
+    <div class="shrink-0">
+      <div class="w-40 h-28 rounded-xl grid place-items-center overflow-hidden" style="background: var(--surface-2); border: 1px solid var(--border);">
+        {% if tenant.logo_path %}
+          <img src="/api/tenants/me/logo" alt="Logo" class="max-h-24 max-w-full object-contain" />
+        {% else %}
+          <span class="muted text-xs">Aucun logo</span>
+        {% endif %}
+      </div>
+      <form method="post" action="/api/tenants/me/logo" enctype="multipart/form-data" class="mt-3 space-y-2">
+        <input type="file" name="file" required accept="image/png,image/jpeg,image/gif"
+               class="block w-40 text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-2 file:rounded-lg file:border-0 file:bg-brand-600 file:text-white file:text-xs file:font-semibold file:cursor-pointer hover:file:brightness-110" />
+        <div class="flex gap-2">
+          <button type="submit" class="btn btn-primary btn-sm">Téléverser</button>
+          {% if tenant.logo_path %}
+          <button type="submit" formaction="/api/tenants/me/logo/delete" formenctype="application/x-www-form-urlencoded" class="btn btn-outline btn-sm text-red-500">Retirer</button>
+          {% endif %}
+        </div>
+      </form>
+    </div>
+    <form method="post" action="/api/tenants/me" class="flex-1">
+      <label class="label">Couleur de marque</label>
+      <div class="flex items-center gap-3">
+        <input type="color" name="primary_color" value="{{ tenant.primary_color or '#4F46E5' }}"
+               class="w-12 h-10 rounded-lg cursor-pointer" style="border: 1px solid var(--border); background: var(--surface);" />
+        <input type="text" value="{{ tenant.primary_color or '#4F46E5' }}" class="input w-32" readonly />
+        <button type="submit" class="btn btn-outline btn-sm">Appliquer la couleur</button>
+      </div>
+      <p class="text-xs muted mt-2">Utilisée pour les titres, l'en-tête du tableau et le total TTC des PDF.</p>
+    </form>
+  </div>
+</div>
+
+<div class="card card-pad">
+  <h3 class="font-semibold mb-1">Modèle de facture & devis</h3>
+  <p class="text-sm muted mb-4">Mise en page appliquée aux PDF générés pour votre société.</p>
+  {% set tpl = tenant.pdf_template or 'classic' %}
+  <form method="post" action="/api/tenants/me" x-data="{ choice: '{{ tpl }}' }">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {% set models = [
+        ('classic', 'Classique', 'En-tête sobre avec filet coloré, tableau à en-tête coloré.'),
+        ('modern', 'Moderne', 'Bandeau couleur plein en haut, cartes d\'info, accents marqués.')
+      ] %}
+      {% for value, label, desc in models %}
+      <label class="block cursor-pointer rounded-xl p-4 transition"
+             :class="choice === '{{ value }}' ? 'ring-2 ring-brand-500' : ''"
+             style="border: 1px solid var(--border); background: var(--surface-2);">
+        <div class="flex items-center gap-2 mb-2">
+          <input type="radio" name="pdf_template" value="{{ value }}" x-model="choice" {% if tpl == value %}checked{% endif %} class="accent-brand-600" />
+          <span class="font-semibold">{{ label }}</span>
+          {% if tpl == value %}<span class="badge badge-indigo ml-auto">Actuel</span>{% endif %}
+        </div>
+        <!-- Mini aperçu schématique -->
+        {% if value == 'classic' %}
+        <div class="rounded-lg overflow-hidden" style="border: 1px solid var(--border); background: #fff;">
+          <div class="flex items-center justify-between px-2 pt-2"><span class="text-[8px] font-bold" style="color: var(--text);">LOGO</span><span class="text-[10px] font-bold" style="color: {{ tpl_color if false else (tenant.primary_color or '#4F46E5') }};">FACTURE</span></div>
+          <div class="mx-2 mt-1 h-0.5" style="background: {{ tenant.primary_color or '#4F46E5' }};"></div>
+          <div class="px-2 py-1"><div class="h-2 rounded-sm mb-1" style="background: {{ tenant.primary_color or '#4F46E5' }};"></div><div class="h-1.5 bg-slate-200 rounded-sm mb-0.5"></div><div class="h-1.5 bg-slate-100 rounded-sm"></div></div>
+        </div>
+        {% else %}
+        <div class="rounded-lg overflow-hidden" style="border: 1px solid var(--border); background: #fff;">
+          <div class="flex items-center justify-between px-2 py-2" style="background: {{ tenant.primary_color or '#4F46E5' }};"><span class="text-[8px] font-bold text-white">LOGO</span><span class="text-[10px] font-bold text-white">FACTURE</span></div>
+          <div class="flex gap-1 px-2 pt-2"><div class="flex-1 h-4 bg-slate-100 rounded-sm"></div><div class="flex-1 h-4 bg-slate-100 rounded-sm"></div><div class="flex-1 h-4 bg-slate-100 rounded-sm"></div></div>
+          <div class="px-2 py-1"><div class="h-2 rounded-sm" style="background: {{ tenant.primary_color or '#4F46E5' }};"></div></div>
+        </div>
+        {% endif %}
+        <p class="text-xs muted mt-2">{{ desc }}</p>
+      </label>
+      {% endfor %}
+    </div>
+    <div class="flex justify-end mt-4"><button type="submit" class="btn btn-primary btn-sm">Enregistrer le modèle</button></div>
+  </form>
+</div>
+
+<div class="card card-pad"
+     x-data="{
+       inv: '{{ tenant.invoice_number_format or 'FA-{YYYY}-{seq}' }}',
+       dev: '{{ tenant.quote_number_format or 'DV-{YYYY}-{seq}' }}',
+       pad: {{ tenant.number_padding or 5 }},
+       year: new Date().getFullYear(),
+       fmt(t) {
+         const seq = String(10).padStart(Math.max(1, Math.min(this.pad, 12)), '0');
+         return t.replaceAll('{YYYY}', this.year)
+                 .replaceAll('{YY}', String(this.year).slice(-2))
+                 .replaceAll('{MM}', String(new Date().getMonth()+1).padStart(2,'0'))
+                 .replaceAll('{seq}', seq);
+       }
+     }">
+  <h3 class="font-semibold mb-1">Numérotation des documents</h3>
+  <p class="text-sm muted mb-4">Format des numéros de factures et devis. Placeholders :
+    <code class="text-xs">{YYYY}</code> année, <code class="text-xs">{YY}</code> année (2 chiffres),
+    <code class="text-xs">{MM}</code> mois, <code class="text-xs">{seq}</code> compteur.</p>
+  <form method="post" action="/api/tenants/me/numbering" class="space-y-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="label">Format facture</label>
+        <input name="invoice_number_format" x-model="inv" class="input" placeholder="FA-{YYYY}-{seq}" />
+        <p class="text-xs muted mt-1">Aperçu : <span class="font-semibold" style="color:var(--brand-strong)" x-text="fmt(inv)"></span></p>
+      </div>
+      <div>
+        <label class="label">Format devis</label>
+        <input name="quote_number_format" x-model="dev" class="input" placeholder="DV-{YYYY}-{seq}" />
+        <p class="text-xs muted mt-1">Aperçu : <span class="font-semibold" style="color:var(--brand-strong)" x-text="fmt(dev)"></span></p>
+      </div>
+      <div>
+        <label class="label">Longueur du compteur</label>
+        <input name="number_padding" type="number" min="1" max="12" x-model.number="pad" class="input w-32" />
+        <p class="text-xs muted mt-1">Ex. 5 → 00010</p>
+      </div>
+      <div class="flex items-end pb-1">
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" name="number_reset_yearly" value="1" {% if tenant.number_reset_yearly %}checked{% endif %} class="accent-brand-600 w-4 h-4" />
+          <span class="text-sm">Remettre le compteur à zéro chaque année</span>
+        </label>
+      </div>
+    </div>
+    <div class="flex justify-end"><button type="submit" class="btn btn-primary btn-sm">Enregistrer la numérotation</button></div>
+  </form>
+</div>
+
+<form method="post" action="/api/tenants/me" class="card card-pad space-y-6">
+  <div>
+    <h3 class="font-semibold mb-4">Identité</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div><label class="label">Raison sociale</label><input name="name" value="{{ tenant.name or '' }}" class="input" /></div>
+      <div><label class="label">Nom légal</label><input name="legal_name" value="{{ tenant.legal_name or '' }}" class="input" /></div>
+      <div><label class="label">Email</label><input name="email" type="email" value="{{ tenant.email or '' }}" class="input" /></div>
+      <div><label class="label">Téléphone</label><input name="phone" value="{{ tenant.phone or '' }}" class="input" /></div>
+      <div><label class="label">Site web</label><input name="website" value="{{ tenant.website or '' }}" class="input" placeholder="https://…" /></div>
+      <div><label class="label">SIRET</label><input name="siret" value="{{ tenant.siret or '' }}" class="input" /></div>
+      <div><label class="label">N° TVA</label><input name="vat_number" value="{{ tenant.vat_number or '' }}" class="input" /></div>
+      <div><label class="label">ICE (Maroc)</label><input name="ice" value="{{ tenant.ice or '' }}" class="input" /></div>
+      <div><label class="label">RC (Maroc)</label><input name="rc" value="{{ tenant.rc or '' }}" class="input" /></div>
+      <div><label class="label">Pays</label><input name="country" value="{{ tenant.country or 'FR' }}" class="input" /></div>
+      <div class="sm:col-span-2"><label class="label">Adresse</label><input name="address_line1" value="{{ tenant.address_line1 or '' }}" class="input" /></div>
+      <div><label class="label">Code postal</label><input name="postal_code" value="{{ tenant.postal_code or '' }}" class="input" /></div>
+      <div><label class="label">Ville</label><input name="city" value="{{ tenant.city or '' }}" class="input" /></div>
+      <div><label class="label">Devise</label>
+        <select name="currency" class="select"><option value="EUR" {% if tenant.currency == 'EUR' %}selected{% endif %}>EUR</option><option value="MAD" {% if tenant.currency == 'MAD' %}selected{% endif %}>MAD</option><option value="USD" {% if tenant.currency == 'USD' %}selected{% endif %}>USD</option></select></div>
+      <div><label class="label">Langue par défaut des documents</label>
+        <select name="locale" class="select">
+          <option value="fr_FR" {% if (tenant.locale or 'fr_FR').startswith('fr') %}selected{% endif %}>Français</option>
+          <option value="en_US" {% if (tenant.locale or '').startswith('en') %}selected{% endif %}>English</option>
+        </select></div>
+    </div>
+  </div>
+
+  <div class="pt-2" style="border-top: 1px solid var(--border);">
+    <h3 class="font-semibold mb-4 mt-4">Coordonnées bancaires</h3>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div><label class="label">Banque</label><input name="bank_name" value="{{ tenant.bank_name or '' }}" class="input" /></div>
+      <div><label class="label">IBAN</label><input name="iban" value="{{ tenant.iban or '' }}" class="input" /></div>
+      <div><label class="label">BIC</label><input name="bic" value="{{ tenant.bic or '' }}" class="input" /></div>
+      <div class="sm:col-span-2">
+        <label class="label">Compte bancaire par défaut</label>
+        <select name="default_bank_account_id" class="select">
+          <option value="">— Aucun (pas de pré-sélection) —</option>
+          {% for a in bank_accounts %}<option value="{{ a.id }}" {% if tenant.default_bank_account_id == a.id %}selected{% endif %}>{{ a.name }}{% if a.bank_name %} ({{ a.bank_name }}){% endif %}</option>{% endfor %}
+        </select>
+        <p class="text-xs muted mt-1">Pré-sélectionné automatiquement sur les nouvelles factures, devis et achats. Gérez vos comptes dans <a href="/banque" style="color:var(--brand-strong)">Trésorerie</a>.</p>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <label class="label">Pied de page des factures</label>
+    <textarea name="invoice_footer" rows="2" class="textarea">{{ tenant.invoice_footer or '' }}</textarea>
+  </div>
+
+  <div class="flex justify-end"><button type="submit" class="btn btn-primary">Enregistrer</button></div>
+</form>
+
+</div>
+{% endblock %}

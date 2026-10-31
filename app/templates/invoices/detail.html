@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+{% block title %}{{ invoice.number }} — LIBFAD{% endblock %}
+{% block heading %}Facture {{ invoice.number }}{% endblock %}
+{% block header_extra %}
+{% if invoice.journal_entry_id %}
+<a href="/comptabilite/ecritures" class="btn btn-ghost btn-sm text-green-600 dark:text-green-400"><i data-lucide="check"></i> Comptabilisée</a>
+{% else %}
+<button class="btn btn-ghost btn-sm" onclick="comptabiliserFacture(this, {{ invoice.id }})"><i data-lucide="book-open-text"></i> Comptabiliser</button>
+{% endif %}
+<button class="btn btn-ghost btn-sm" onclick="duplicateInvoice(this, {{ invoice.id }})"><i data-lucide="copy"></i> Dupliquer</button>
+<button class="btn btn-outline btn-sm" onclick="regenPdf(this, {{ invoice.id }})">📄 Régénérer PDF</button>
+<a href="/api/invoices/{{ invoice.id }}/pdf?inline=1" target="_blank" rel="noopener" class="btn btn-outline btn-sm"><i data-lucide="eye"></i> Aperçu</a>
+<a href="/api/invoices/{{ invoice.id }}/pdf" class="btn btn-outline btn-sm">⬇ Télécharger PDF</a>
+{% if wa_number %}
+{% set is_unpaid = invoice.status in ['sent','issued','overdue','partially_paid'] and (invoice.amount_due | float) > 0 %}
+{% if is_unpaid %}
+{% set wamsg = "Bonjour, petit rappel concernant la facture N° " ~ invoice.number ~ " : il reste " ~ (invoice.amount_due | round(2)) ~ " " ~ invoice.currency ~ " à régler (échéance le " ~ invoice.due_date.strftime('%d/%m/%Y') ~ "). Merci d'avance pour votre règlement. Cordialement, " ~ (current_user.full_name or settings.app_name) ~ "." %}
+{% else %}
+{% set wamsg = "Bonjour, voici votre facture " ~ invoice.number ~ " d'un montant de " ~ (invoice.total_ttc | round(2)) ~ " " ~ invoice.currency ~ ". Cordialement, " ~ (current_user.full_name or settings.app_name) ~ "." %}
+{% endif %}
+<a href="https://wa.me/{{ wa_number }}?text={{ wamsg | urlencode }}" target="_blank" rel="noopener"
+   class="btn btn-outline btn-sm" style="color:#128C7E;border-color:#128C7E"
+   title="{{ 'Relancer le client par WhatsApp' if is_unpaid else 'Envoyer par WhatsApp au client' }}">
+  <i data-lucide="message-circle"></i> {{ 'Relancer WhatsApp' if is_unpaid else 'WhatsApp' }}
+</a>
+{% endif %}
+<button class="btn btn-primary btn-sm" onclick="sendInvoice(this, {{ invoice.id }})">📧 Envoyer par email</button>
+{% endblock %}
+
+{% block content %}
+{% set status_label = {'paid':'Payée','overdue':'En retard','sent':'Envoyée','draft':'Brouillon','issued':'Émise','partially_paid':'Partiel','cancelled':'Annulée'} %}
+{% set status_color = {'paid':'green','overdue':'red','sent':'blue','draft':'slate','issued':'indigo','partially_paid':'amber','cancelled':'rose'} %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2 card card-pad">
+    <div class="flex justify-between items-start mb-6">
+      <div>
+        <p class="text-xs muted uppercase tracking-wide">Facture</p>
+        <h2 class="text-2xl font-bold">{{ invoice.number }}</h2>
+        <span class="badge badge-{{ status_color.get(invoice.status, 'slate') }} mt-2">{{ status_label.get(invoice.status, invoice.status) }}</span>
+      </div>
+      <div class="text-right text-sm">
+        <p class="muted">Émise le</p>
+        <p class="font-medium">{{ invoice.issue_date.strftime('%d/%m/%Y') }}</p>
+        <p class="muted mt-2">Échéance</p>
+        <p class="font-medium">{{ invoice.due_date.strftime('%d/%m/%Y') }}</p>
+      </div>
+    </div>
+
+    {% if client %}
+    <div class="mb-6 text-sm rounded-xl p-4" style="background: var(--surface-2);">
+      <p class="muted uppercase text-xs tracking-wide">Client</p>
+      <p class="font-semibold">{{ client.name }}</p>
+      <p class="muted">{{ client.billing_address_line1 or '' }}</p>
+      <p class="muted">{{ client.billing_postal_code or '' }} {{ client.billing_city or '' }} — {{ client.billing_country or '' }}</p>
+    </div>
+    {% endif %}
+
+    <div class="mb-6 text-sm rounded-xl p-4" style="background: var(--surface-2);">
+      <label class="muted uppercase text-xs tracking-wide">Compte d'encaissement</label>
+      <select class="select mt-2" onchange="setInvoiceBank(this, {{ invoice.id }})">
+        <option value="">— Aucun —</option>
+        {% for a in bank_accounts %}<option value="{{ a.id }}" {% if invoice.bank_account_id == a.id %}selected{% endif %}>{{ a.name }}{% if a.bank_name %} ({{ a.bank_name }}){% endif %}</option>{% endfor %}
+      </select>
+    </div>
+
+    <div class="overflow-x-auto">
+      <table class="app-table">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th class="text-right">Qté</th>
+            <th class="text-right">PU HT</th>
+            <th class="text-right">TVA</th>
+            <th class="text-right">Total HT</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for it in invoice.items %}
+          <tr>
+            <td>{{ it.description }}</td>
+            <td class="text-right">{{ it.quantity }}</td>
+            <td class="text-right">{{ it.unit_price | round(2) }}</td>
+            <td class="text-right muted">{{ it.tax_rate }}%</td>
+            <td class="text-right font-medium">{{ it.line_subtotal_ht | round(2) }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-5 flex justify-end">
+      <div class="w-72 text-sm space-y-1.5">
+        <div class="flex justify-between"><span class="muted">Total HT</span><span>{{ invoice.subtotal_ht | round(2) }} {{ invoice.currency }}</span></div>
+        <div class="flex justify-between"><span class="muted">TVA</span><span>{{ invoice.total_tax | round(2) }}</span></div>
+        <div class="flex justify-between font-bold text-base pt-2 mt-1" style="border-top: 1px solid var(--border);"><span>Total TTC</span><span>{{ invoice.total_ttc | round(2) }} {{ invoice.currency }}</span></div>
+        <div class="flex justify-between text-green-600 dark:text-green-400"><span>Payé</span><span>{{ invoice.amount_paid | round(2) }}</span></div>
+        <div class="flex justify-between text-amber-600 dark:text-amber-400 font-semibold"><span>Reste dû</span><span>{{ invoice.amount_due | round(2) }}</span></div>
+      </div>
+    </div>
+
+    {% if invoice.notes_public %}
+    <div class="mt-6 text-sm muted pt-4" style="border-top: 1px solid var(--border);">
+      <p class="font-semibold mb-1" style="color: var(--text);">Notes</p>
+      <p>{{ invoice.notes_public }}</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="space-y-4">
+    <div class="card card-pad">
+      <h3 class="font-semibold mb-3">Paiements</h3>
+      <form onsubmit="return recordPayment(event, {{ invoice.id }})" class="space-y-2 text-sm">
+        <div class="grid grid-cols-2 gap-2">
+          <input name="amount" type="number" step="0.01" min="0.01" placeholder="Montant" required class="input" />
+          <select name="method" class="select">
+            <option value="transfer">Virement</option><option value="card">Carte</option><option value="cash">Espèces</option><option value="check">Chèque</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-primary w-full">+ Enregistrer paiement</button>
+      </form>
+      <ul class="mt-3 text-sm divide-y divide-slate-100">
+        {% for p in invoice.payments %}
+          <li class="py-2 flex justify-between"><span class="muted">{{ p.paid_on.strftime('%d/%m/%Y') }} — {{ p.method }}</span><span class="font-medium">{{ p.amount | round(2) }} {{ p.currency }}</span></li>
+        {% else %}
+          <li class="py-3 muted text-center">Aucun paiement enregistré</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="card card-pad">
+      <h3 class="font-semibold mb-3">Relance IA ✨</h3>
+      <form onsubmit="return generateReminder(event, {{ invoice.id }})" class="text-sm space-y-2">
+        <select name="tone" class="select">
+          <option value="polite">Ton poli</option><option value="firm">Ferme</option><option value="final">Mise en demeure</option>
+        </select>
+        <textarea name="custom_instructions" rows="2" placeholder="Instructions facultatives" class="textarea"></textarea>
+        <button type="submit" class="btn w-full text-white" style="background: linear-gradient(180deg,#f59e0b,#d97706);">✨ Générer un email de relance</button>
+      </form>
+      <div id="reminder-out" class="mt-3 text-xs muted whitespace-pre-wrap"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function setInvoiceBank(sel, id) {
+  const fd = new FormData(); if (sel.value) fd.append('bank_account_id', sel.value);
+  try {
+    const res = await fetch(`/api/invoices/${id}/bank-account`, { method: 'POST', headers: { 'Accept': 'application/json' }, body: fd });
+    if (!res.ok) throw new Error('Erreur ' + res.status);
+    window.toast('Compte d\'encaissement mis à jour.', 'success');
+  } catch (e) { window.toast('Échec : ' + e.message, 'error'); }
+}
+async function _postAction(btn, url, busyLabel) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = busyLabel;
+  try {
+    const res = await fetch(url, { method: 'POST', headers: { 'Accept': 'application/json' } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || ('Erreur ' + res.status));
+    return data;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+
+async function comptabiliserFacture(btn, id) {
+  try {
+    await _postAction(btn, `/api/accounting/invoices/${id}/post`, '⏳ Comptabilisation…');
+    window.toast('Facture comptabilisée (journal des ventes).', 'success');
+    setTimeout(() => location.reload(), 800);
+  } catch (e) { window.toast('Échec : ' + e.message, 'error'); }
+}
+
+async function duplicateInvoice(btn, id) {
+  try {
+    const data = await _postAction(btn, `/api/invoices/${id}/duplicate`, '⏳ Copie…');
+    window.toast('Facture dupliquée : ' + (data.number || '') + '.', 'success');
+    setTimeout(() => { window.location.href = '/invoices/' + data.invoice_id; }, 800);
+  } catch (e) { window.toast('Échec : ' + e.message, 'error'); }
+}
+
+async function regenPdf(btn, id) {
+  try {
+    await _postAction(btn, `/api/invoices/${id}/pdf`, '⏳ Génération…');
+    window.toast('PDF régénéré avec succès.', 'success');
+  } catch (e) {
+    window.toast('Échec de la génération du PDF : ' + e.message, 'error');
+  }
+}
+
+async function sendInvoice(btn, id) {
+  try {
+    const data = await _postAction(btn, `/api/invoices/${id}/send`, '⏳ Envoi…');
+    window.toast('Facture envoyée à ' + (data.sent_to || 'destinataire') + '.', 'success');
+    setTimeout(() => window.location.reload(), 1200);
+  } catch (e) {
+    window.toast('Échec de l\'envoi : ' + e.message, 'error');
+  }
+}
+
+async function _postJson(url, payload) {
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    let msg = data.detail;
+    if (Array.isArray(msg)) msg = msg.map(d => d.msg).join(', ');
+    throw new Error(msg || ('Erreur ' + res.status));
+  }
+  return data;
+}
+
+async function recordPayment(event, id) {
+  event.preventDefault();
+  const form = event.target;
+  const btn = form.querySelector('button[type=submit]');
+  const amount = parseFloat(form.amount.value);
+  if (!amount || amount <= 0) { window.toast('Montant invalide.', 'error'); return false; }
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.textContent = '⏳ Enregistrement…';
+  try {
+    await _postJson('/api/payments', { invoice_id: id, amount: amount, method: form.method.value });
+    window.toast('Paiement enregistré.', 'success');
+    setTimeout(() => window.location.reload(), 900);
+  } catch (e) {
+    window.toast('Échec de l\'enregistrement : ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+  return false;
+}
+
+async function generateReminder(event, id) {
+  event.preventDefault();
+  const form = event.target;
+  const btn = form.querySelector('button[type=submit]');
+  const out = document.getElementById('reminder-out');
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.textContent = '✨ Génération…';
+  out.textContent = '';
+  try {
+    const data = await _postJson('/api/dunning/generate-reminder', {
+      invoice_id: id,
+      tone: form.tone.value,
+      custom_instructions: form.custom_instructions.value || null,
+    });
+    const subject = data.subject || '';
+    const body = data.body || '';
+    out.innerHTML = '';
+    const subjEl = document.createElement('p');
+    subjEl.className = 'font-semibold';
+    subjEl.style.color = 'var(--text)';
+    subjEl.textContent = 'Objet : ' + subject;
+    const bodyEl = document.createElement('p');
+    bodyEl.className = 'mt-1';
+    bodyEl.textContent = body;
+    out.appendChild(subjEl);
+    out.appendChild(bodyEl);
+  } catch (e) {
+    out.textContent = '';
+    window.toast('Échec de la génération : ' + e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+  return false;
+}
+</script>
+{% endblock %}

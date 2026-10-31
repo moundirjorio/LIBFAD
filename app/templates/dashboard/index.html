@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Tableau de bord — LIBFAD{% endblock %}
+{% block heading %}Tableau de bord{% endblock %}
+{% block header_extra %}
+<a href="/invoices/new" class="btn btn-primary btn-sm"><i data-lucide="plus"></i> Nouvelle facture</a>
+{% endblock %}
+{% block content %}
+{% set status_label = {'paid':'Payée','overdue':'En retard','sent':'Envoyée','draft':'Brouillon','issued':'Émise','partially_paid':'Partiel','cancelled':'Annulée'} %}
+{% set status_color = {'paid':'green','overdue':'red','sent':'blue','draft':'slate','issued':'indigo','partially_paid':'amber','cancelled':'rose'} %}
+
+{% if onboarding and onboarding.done < onboarding.total %}
+<div class="card card-pad mb-6" x-data="{ hidden: false }" x-show="!hidden">
+  <div class="flex items-center justify-between gap-3 mb-4">
+    <div>
+      <p class="eyebrow">Bien démarrer</p>
+      <h3 class="font-bold text-lg mt-1">Configurez votre espace ({{ onboarding.done }}/{{ onboarding.total }})</h3>
+    </div>
+    <button @click="hidden = true" class="btn btn-ghost btn-icon" title="Masquer"><i data-lucide="x"></i></button>
+  </div>
+  <div class="h-2 rounded-full overflow-hidden mb-4" style="background:var(--surface-hover)">
+    <div class="h-full" style="width: {{ (onboarding.done / onboarding.total * 100) | round }}%; background: var(--grad-brand);"></div>
+  </div>
+  <div class="space-y-2">
+    {% for label, ok, href in onboarding.steps %}
+    <a href="{{ href }}" class="flex items-center gap-3 p-2 rounded-lg transition hover:bg-slate-50 dark:hover:bg-white/5">
+      {% if ok %}
+      <span class="w-6 h-6 rounded-full grid place-items-center bg-emerald-100 text-emerald-600 dark:bg-emerald-500/20 shrink-0"><i data-lucide="check" style="width:.9rem;height:.9rem"></i></span>
+      <span class="text-sm line-through muted">{{ label }}</span>
+      {% else %}
+      <span class="w-6 h-6 rounded-full grid place-items-center shrink-0" style="border:2px solid var(--border-strong)"></span>
+      <span class="text-sm font-medium">{{ label }}</span>
+      <i data-lucide="arrow-right" class="ml-auto muted" style="width:1rem;height:1rem"></i>
+      {% endif %}
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<div class="page-intro dashboard-welcome">
+  <div>
+    <p class="eyebrow">Votre espace de travail</p>
+    <h2>Bonjour {{ current_user.full_name.split(' ')[0] if current_user.full_name else '' }},</h2>
+    <p>Un aperçu clair de votre activité et de vos priorités.</p>
+  </div>
+  <div class="dashboard-signal">
+    <span class="dashboard-signal-icon"><i data-lucide="sparkles"></i></span>
+    <span><small>À surveiller aujourd’hui</small><strong>{{ kpis.overdue_count }} facture{{ 's' if kpis.overdue_count != 1 else '' }} en retard</strong></span>
+    <a href="/dunning" aria-label="Voir les relances"><i data-lucide="arrow-up-right"></i></a>
+  </div>
+</div>
+
+<div class="quick-actions mb-6">
+  <a href="/invoices/new" class="quick-action"><span class="quick-icon quick-violet"><i data-lucide="receipt-text"></i></span><span><strong>Créer une facture</strong><small>Facturer un client</small></span><i data-lucide="arrow-up-right" class="quick-arrow"></i></a>
+  <a href="/quotes" class="quick-action"><span class="quick-icon quick-orange"><i data-lucide="file-check-2"></i></span><span><strong>Nouveau devis</strong><small>Préparer une offre</small></span><i data-lucide="arrow-up-right" class="quick-arrow"></i></a>
+  <a href="/clients" class="quick-action"><span class="quick-icon quick-green"><i data-lucide="user-plus"></i></span><span><strong>Ajouter un client</strong><small>Développer le CRM</small></span><i data-lucide="arrow-up-right" class="quick-arrow"></i></a>
+  <a href="/documents" class="quick-action"><span class="quick-icon quick-pink"><i data-lucide="scan-text"></i></span><span><strong>Scanner un document</strong><small>Extraire avec l’IA</small></span><i data-lucide="arrow-up-right" class="quick-arrow"></i></a>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+  <div class="stat stat-primary">
+    <div class="stat-ico"><i data-lucide="circle-euro"></i></div>
+    <p class="stat-label">CA encaissé</p>
+    <p class="stat-value">{{ (kpis.collected_year | round(0)) }} <span class="text-base font-semibold muted">EUR</span></p>
+    <p class="stat-hint">Année en cours</p>
+  </div>
+  <div class="stat">
+    <div class="stat-ico stat-ico-amber"><i data-lucide="clock-3"></i></div>
+    <p class="stat-label">Encours</p>
+    <p class="stat-value text-amber-500">{{ (kpis.outstanding | round(0)) }}</p>
+    <p class="stat-hint">Factures non payées</p>
+  </div>
+  <div class="stat">
+    <div class="stat-ico stat-ico-red"><i data-lucide="triangle-alert"></i></div>
+    <p class="stat-label">En retard</p>
+    <p class="stat-value text-red-500">{{ kpis.overdue_count }}</p>
+    <p class="stat-hint">Factures dépassées</p>
+  </div>
+  <div class="stat">
+    <div class="stat-ico"><i data-lucide="users"></i></div>
+    <p class="stat-label">Clients actifs</p>
+    <p class="stat-value">{{ kpis.client_count }}</p>
+    <p class="stat-hint">Total fiches CRM</p>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+  <!-- Graphique de trésorerie (CA mensuel de l'année) -->
+  <div class="lg:col-span-2 card card-pad">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold">Chiffre d'affaires {{ kpis.get('year', '') }}<span class="muted text-sm font-normal"> — par mois</span></h2>
+      <span class="text-sm muted">Total : {{ kpis.revenue_year | money(currency, current_user.locale) }}</span>
+    </div>
+    {% set months = ['J','F','M','A','M','J','J','A','S','O','N','D'] %}
+    {% set maxrev = (kpis.monthly_revenue | max) or 1 %}
+    <div class="flex items-end gap-1.5 sm:gap-2" style="height:180px">
+      {% for v in kpis.monthly_revenue %}
+      <div class="flex-1 flex flex-col items-center justify-end h-full group">
+        <div class="w-full flex items-end justify-center h-full">
+          <div class="bar w-full" style="height: {{ ((v / maxrev) * 100) if maxrev else 0 }}%; min-height:3px;"
+               title="{{ months[loop.index0] }} : {{ v | money(currency, current_user.locale) }}"></div>
+        </div>
+        <span class="text-[10px] muted mt-1">{{ months[loop.index0] }}</span>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Balance âgée des créances -->
+  <div class="card card-pad">
+    <h2 class="font-semibold mb-1">Balance âgée</h2>
+    <p class="text-xs muted mb-4">Créances par ancienneté de retard</p>
+    {% set aged = kpis.aged_balance %}
+    {% set tot = (aged.get('0_30',0) + aged.get('31_60',0) + aged.get('61_90',0) + aged.get('over_90',0)) or 0 %}
+    <div class="flex h-3 rounded-full overflow-hidden mb-4" style="background:var(--surface-hover)">
+      <div style="width: {{ (aged['0_30']/tot*100) if tot else 0 }}%; background:#22c55e"></div>
+      <div style="width: {{ (aged['31_60']/tot*100) if tot else 0 }}%; background:#f59e0b"></div>
+      <div style="width: {{ (aged['61_90']/tot*100) if tot else 0 }}%; background:#f97316"></div>
+      <div style="width: {{ (aged['over_90']/tot*100) if tot else 0 }}%; background:#ef4444"></div>
+    </div>
+    {% set rows = [('0–30 j','0_30','#22c55e'),('31–60 j','31_60','#f59e0b'),('61–90 j','61_90','#f97316'),('+90 j','over_90','#ef4444')] %}
+    <div class="space-y-2">
+      {% for label, key, color in rows %}
+      <div class="flex items-center justify-between text-sm">
+        <span class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full" style="background:{{ color }}"></span>{{ label }}</span>
+        <span class="font-semibold">{{ aged[key] | money(currency, current_user.locale) }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="flex items-center justify-between text-sm mt-3 pt-3 border-t" style="border-color:var(--border)">
+      <span class="muted">Total dû</span><span class="font-bold">{{ tot | money(currency, current_user.locale) }}</span>
+    </div>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2 card">
+    <div class="card-header">
+      <h2>Factures récentes</h2>
+      <a href="/invoices" class="text-sm text-brand-600 dark:text-brand-400 hover:underline">Tout voir →</a>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="app-table">
+        <thead>
+          <tr>
+            <th>N°</th><th>Date</th><th>Statut</th><th class="text-right">Montant</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for inv in recent_invoices %}
+          <tr>
+            <td><a href="/invoices/{{ inv.id }}" class="text-brand-600 dark:text-brand-400 hover:underline font-medium">{{ inv.number }}</a></td>
+            <td class="muted">{{ inv.issue_date.strftime('%d/%m/%Y') }}</td>
+            <td><span class="badge badge-{{ status_color.get(inv.status, 'slate') }}">{{ status_label.get(inv.status, inv.status) }}</span></td>
+            <td class="text-right font-semibold">{{ inv.total_ttc | round(2) }} {{ inv.currency }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="empty">Aucune facture pour l'instant.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <h2>Factures en retard</h2>
+      {% if overdue %}<span class="badge badge-red">{{ overdue|length }}</span>{% endif %}
+    </div>
+    <ul class="divide-y divide-slate-100">
+    {% for inv in overdue %}
+      <li class="px-5 py-3 flex items-center justify-between text-sm">
+        <div>
+          <a href="/invoices/{{ inv.id }}" class="font-medium text-brand-600 dark:text-brand-400 hover:underline">{{ inv.number }}</a>
+          <p class="text-xs muted">Échue le {{ inv.due_date.strftime('%d/%m/%Y') }}</p>
+        </div>
+        <span class="text-red-500 font-semibold">{{ inv.amount_due | round(2) }} {{ inv.currency }}</span>
+      </li>
+    {% else %}
+      <li class="empty">Aucun retard ! 🎉</li>
+    {% endfor %}
+    </ul>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const todayLabel = document.getElementById('today-label');
+  if (todayLabel) todayLabel.textContent = new Intl.DateTimeFormat('fr-FR', {
+    weekday: 'long', day: 'numeric', month: 'long'
+  }).format(new Date());
+</script>
+{% endblock %}

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="{{ lang | default('fr') }}">
+<head>
+<meta charset="UTF-8">
+<title>{{ quote.number }}</title>
+{% set blue = '#337ab7' %}
+{% set rates = quote.items | map(attribute='tax_rate') | map('float') | unique | list %}
+<style>
+  @page {
+    size: 596pt 842pt;
+    @frame content_frame { left: 16mm; width: 178mm; top: 13mm; height: 244mm; }
+    @frame footer_frame { -pdf-frame-content: legal-footer; left: 16mm; width: 178mm; top: 273.2mm; height: 15mm; }
+  }
+  html, body { margin: 0; padding: 0; }
+  body { font-family: Helvetica, Arial, sans-serif; color: #111; font-size: 10.5pt; line-height: 1.35; }
+  p { margin: 0; }
+  .logo-box { width: 100%; height: 72pt; text-align: center; border-collapse: collapse; }
+  .logo-box td { height: 72pt; padding: 0; vertical-align: middle; }
+  .logo { max-height: 32mm; max-width: 72mm; }
+  .doc-meta { width: 100%; margin: 0 0 5mm 0; border-collapse: collapse; }
+  .doc-meta td { padding: 0; vertical-align: top; }
+  .meta-right { width: 41%; font-size: 11pt; line-height: 1.5; }
+  .meta-number { font-weight: bold; font-size: 11.2pt; }
+  .validity { font-size: 9pt; color: #444; }
+  .parties { width: 100%; border-collapse: collapse; margin-bottom: 12mm; }
+  .parties td { padding: 0; vertical-align: top; }
+  .issuer { width: 58%; } .customer { width: 42%; }
+  .blue { color: {{ blue }}; font-weight: bold; font-size: 11pt; }
+  .party-name { font-weight: bold; margin-top: 2pt; }
+  .address { margin-top: 2pt; line-height: 1.45; }
+  .subject { margin: 0 0 3mm 11mm; font-weight: bold; }
+  .items { width: 90%; margin-left: 5%; border-collapse: collapse; table-layout: fixed; }
+  .items th { height: 10mm; background: {{ blue }}; color: #fff; border: 1px solid #8c8c8c; padding: 2pt 5pt; font-size: 9.5pt; text-align: center; font-weight: bold; }
+  .items td { height: 8mm; border: 1px solid #aaa; padding: 2pt 7pt; font-size: 10pt; }
+  .items .desc { font-weight: bold; } .c { text-align: center; } .r { text-align: right; }
+  .section-gap { line-height: 7mm; font-size: 1pt; margin: 0; }
+  .totals-layout { width: 90%; margin-left: 5%; border-collapse: collapse; }
+  .totals-layout td { padding: 0; vertical-align: top; }
+  .totals { width: 100%; border-collapse: collapse; }
+  .totals td { height: 7.5mm; border: 1px solid #aaa; padding: 2pt 7pt; font-size: 10.5pt; vertical-align: middle; }
+  .totals .lbl { background: #e8e8e8; }
+  .totals .final td { font-weight: bold; font-size: 10.8pt; }
+  .words { margin: 21mm 0 0 8mm; font-size: 10.5pt; }
+  .approval { margin: 8mm 0 0 8mm; font-size: 9.5pt; }
+  .legal { text-align: center; font-size: 8.3pt; line-height: 1.35; }
+  .legal-address { font-style: italic; }
+</style>
+</head>
+<body>
+  <table class="logo-box" width="100%"><tr><td align="center">{% if logo_data_uri %}<img src="{{ logo_data_uri }}" class="logo" />{% endif %}</td></tr></table>
+  <table class="doc-meta"><tr><td>&nbsp;</td><td class="meta-right">
+    <p>{{ t.date }} : {{ quote.issue_date.strftime(t.date_fmt) }}</p>
+    <p class="meta-number">{{ t.quote_number }} {{ quote.number }}</p>
+    <p class="validity">{{ t.valid_until }} {{ quote.valid_until.strftime(t.date_fmt) }}</p>
+  </td></tr></table>
+  <table class="parties"><tr>
+    <td class="issuer">
+      <p class="blue">{{ tenant.legal_name or tenant.name }}</p>
+      {% if tenant.address_line1 %}<p class="address">{{ tenant.address_line1 }}{% if tenant.address_line2 %}<br/>{{ tenant.address_line2 }}{% endif %}</p>{% endif %}
+      {% if tenant.postal_code or tenant.city %}<p>{{ tenant.postal_code or '' }} {{ tenant.city or '' }}</p>{% endif %}
+      {% if tenant.ice %}<p>{{ t.ice }} {{ tenant.ice }}</p>{% endif %}
+    </td>
+    <td class="customer">
+      <p class="blue">{{ t.client }}</p><p class="party-name">{{ client.legal_name or client.name }}</p>
+      {% if client.billing_address_line1 %}<p class="address">{{ client.billing_address_line1 }}{% if client.billing_address_line2 %}<br/>{{ client.billing_address_line2 }}{% endif %}</p>{% endif %}
+      {% if client.billing_postal_code or client.billing_city %}<p>{{ client.billing_postal_code or '' }} {{ client.billing_city or '' }}</p>{% endif %}
+      {% if client.ice %}<p>{{ t.ice }} {{ client.ice }}</p>{% elif client.vat_number %}<p>{{ t.vat }} {{ client.vat_number }}</p>{% endif %}
+    </td>
+  </tr></table>
+  <p class="subject">{{ t.subject }} {{ quote.notes_public or t.subject_quote }}</p>
+  <table class="items" width="95%" align="right" repeat="1"><thead><tr>
+    <th style="width:38%;">{{ t.col_desc }}</th><th style="width:10%;">{{ t.col_unit }}</th><th style="width:12%;">{{ t.col_qty }}</th><th style="width:18%;">{{ t.col_pu | safe }}</th><th style="width:22%;">{{ t.col_total }}</th>
+  </tr></thead><tbody>
+    {% for it in quote.items %}<tr><td class="desc">{{ it.description }}</td><td class="c">{{ it.unit or '1' }}</td><td class="c">{{ it.quantity | int if it.quantity == it.quantity | int else it.quantity }}</td><td class="r">{{ it.unit_price | amount }}</td><td class="r">{{ it.line_subtotal_ht | amount }}</td></tr>{% endfor %}
+  </tbody></table>
+  <p class="section-gap">&nbsp;</p>
+  <table class="totals-layout" width="95%" align="right"><tr><td style="width:50%;">&nbsp;</td><td style="width:50%;">
+    <table class="totals">
+      <tr><td class="lbl">{{ t.total_ht }}</td><td class="r">{{ quote.subtotal_ht | amount }}</td></tr>
+      <tr><td class="lbl">{{ t.total_vat }}{% if rates | length == 1 %} {{ rates[0] | int }}%{% endif %}</td><td class="r">{{ quote.total_tax | amount }}</td></tr>
+      <tr class="final"><td class="lbl">{{ t.total_ttc }}</td><td class="r">{{ quote.total_ttc | amount }}</td></tr>
+    </table>
+  </td></tr></table>
+  <p class="words">{{ t.words_quote }} {% if lang == 'en' %}{{ quote.total_ttc | amount }} {{ quote.currency }}{% else %}{{ quote.total_ttc | in_words(quote.currency) }}{% endif %}</p>
+  <p class="approval">{{ t.approval }}</p>
+  <div id="legal-footer" class="legal">
+    {% if tenant.address_line1 %}<div class="legal-address">{{ tenant.address_line1 }}{% if tenant.address_line2 %}, {{ tenant.address_line2 }}{% endif %}{% if tenant.postal_code or tenant.city %}, {{ tenant.city or '' }} {{ tenant.postal_code or '' }}{% endif %}</div>{% endif %}
+    <div><strong>{{ tenant.legal_name or tenant.name }}</strong>{% if tenant.rc %}, {{ t.rc }} : <strong>{{ tenant.rc }}</strong>{% endif %}{% if tenant.siret %}, {{ t.siret }} : <strong>{{ tenant.siret }}</strong>{% endif %}{% if tenant.vat_number %}, {{ t.vat }} <strong>{{ tenant.vat_number }}</strong>{% endif %}{% if tenant.invoice_footer %}<br/>{{ tenant.invoice_footer }}{% endif %}</div>
+  </div>
+</body>
+</html>

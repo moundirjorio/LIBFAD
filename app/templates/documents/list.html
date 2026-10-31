@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Documents OCR — LIBFAD{% endblock %}
+{% block heading %}Documents & OCR fournisseurs{% endblock %}
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="card card-pad">
+    <h2 class="font-semibold mb-4">Importer une facture fournisseur</h2>
+    <form method="post" action="/api/documents/upload-form" enctype="multipart/form-data" class="space-y-3 text-sm">
+      <input type="file" name="file" required accept="image/*,application/pdf"
+             class="block w-full text-sm text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-brand-600 file:text-white file:font-semibold file:cursor-pointer hover:file:brightness-110" />
+      <select name="kind" class="select">
+        <option value="supplier_invoice">Facture fournisseur</option>
+        <option value="receipt">Reçu</option>
+        <option value="contract">Contrat</option>
+        <option value="other">Autre</option>
+      </select>
+      <button type="submit" class="btn btn-primary w-full">📤 Téléverser</button>
+    </form>
+    <p class="text-xs muted mt-4 leading-relaxed">L'OCR Claude Vision s'exécute automatiquement après l'upload. En cas d'échec, utilisez « Relancer OCR ».</p>
+  </div>
+
+  <div class="lg:col-span-2 card">
+    <div class="card-header"><h2>Documents reçus</h2></div>
+    <div class="overflow-x-auto">
+      <table class="app-table">
+        <thead>
+          <tr><th>Fichier</th><th>Fournisseur</th><th>N°</th><th>Date</th><th class="text-right">TTC</th><th>OCR</th><th></th></tr>
+        </thead>
+        <tbody>
+        {% for d in documents %}
+          <tr>
+            <td class="truncate max-w-xs">{{ d.original_filename }}</td>
+            <td>{{ d.supplier_name or '—' }}</td>
+            <td class="muted">{{ d.document_number or '—' }}</td>
+            <td class="muted">{{ d.document_date.strftime('%d/%m/%Y') if d.document_date else '—' }}</td>
+            <td class="text-right">{{ (d.total_ttc | round(2)) if d.total_ttc else '—' }} {{ d.currency or '' }}</td>
+            <td>
+              {% set color = {'done':'green','processing':'amber','failed':'red','pending':'slate'}.get(d.ocr_status,'slate') %}
+              <span class="badge badge-{{ color }}"{% if d.ocr_status == 'failed' and d.ocr_error %} title="{{ d.ocr_error }}"{% endif %}>{{ d.ocr_status }}</span>
+            </td>
+            <td class="text-right">
+              {% if d.ocr_status in ('pending','failed') %}
+              <form method="post" action="/api/documents/{{ d.id }}/ocr-form" class="inline">
+                <button class="btn btn-ghost btn-sm">{{ 'Relancer OCR ✨' if d.ocr_status == 'failed' else 'Lancer OCR ✨' }}</button>
+              </form>
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="7" class="empty">Aucun document.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

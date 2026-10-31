@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Rapports & Analytics — LIBFAD{% endblock %}
+{% block heading %}Rapports & Analytics{% endblock %}
+{% block header_extra %}
+<select id="year-select" class="select select-sm" onchange="loadAll()">
+  {% for y in range(current_year, current_year - 5, -1) %}<option value="{{ y }}">{{ y }}</option>{% endfor %}
+</select>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  <div class="card card-pad"><p class="text-xs muted uppercase tracking-wide">Chiffre d'affaires</p><p id="kpi-revenue" class="stat-value">—</p></div>
+  <div class="card card-pad"><p class="text-xs muted uppercase tracking-wide">Encaissé</p><p id="kpi-collected" class="stat-value text-green-500">—</p></div>
+  <div class="card card-pad"><p class="text-xs muted uppercase tracking-wide">Restant dû</p><p id="kpi-outstanding" class="stat-value text-amber-500">—</p></div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2 card card-pad">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-semibold">Chiffre d'affaires mensuel</h3>
+      <a id="export-revenue" href="#" class="btn btn-outline btn-sm">⬇ Excel</a>
+    </div>
+    <canvas id="revenue-chart" height="120"></canvas>
+  </div>
+  <div class="card card-pad">
+    <h3 class="font-semibold mb-4">Balance âgée (impayés)</h3>
+    <canvas id="aged-chart" height="200"></canvas>
+  </div>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+  <div class="card card-pad">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-semibold">Top clients</h3>
+      <a href="/api/reports/export/top-clients.xlsx" class="btn btn-outline btn-sm">⬇ Excel</a>
+    </div>
+    <div class="overflow-x-auto">
+      <table class="app-table">
+        <thead><tr><th>Client</th><th class="text-right">CA TTC</th><th class="text-right">Factures</th></tr></thead>
+        <tbody id="top-clients-body"><tr><td colspan="3" class="empty">Chargement…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+  <div class="card card-pad">
+    <h3 class="font-semibold mb-4">Anomalies détectées ✨</h3>
+    <div class="overflow-x-auto">
+      <table class="app-table">
+        <thead><tr><th>Facture</th><th class="text-right">Montant</th><th class="text-right">Moyenne</th><th class="text-right">Écart (z)</th></tr></thead>
+        <tbody id="anomalies-body"><tr><td colspan="4" class="empty">Chargement…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+const MONTHS = ['Jan','Fév','Mar','Avr','Mai','Juin','Juil','Août','Sep','Oct','Nov','Déc'];
+let revenueChart = null, agedChart = null;
+
+function fmt(n) { return (n || 0).toLocaleString('fr-FR', { maximumFractionDigits: 0 }); }
+
+async function getJson(url) {
+  const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+  if (!res.ok) throw new Error('Erreur ' + res.status);
+  return res.json();
+}
+
+async function loadRevenue(year) {
+  const data = await getJson('/api/reports/revenue?year=' + year);
+  document.getElementById('kpi-revenue').textContent = fmt(data.total_revenue) + ' €';
+  document.getElementById('kpi-collected').textContent = fmt(data.total_collected) + ' €';
+  document.getElementById('kpi-outstanding').textContent = fmt(data.outstanding) + ' €';
+  document.getElementById('export-revenue').href = '/api/reports/export/revenue.xlsx?year=' + year;
+
+  const ctx = document.getElementById('revenue-chart');
+  if (revenueChart) revenueChart.destroy();
+  revenueChart = new Chart(ctx, {
+    type: 'bar',
+    data: { labels: MONTHS, datasets: [{ label: 'CA TTC', data: data.monthly, backgroundColor: '#6366f1', borderRadius: 6 }] },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } },
+  });
+}
+
+async function loadAged() {
+  const data = await getJson('/api/reports/aged-balance');
+  const ctx = document.getElementById('aged-chart');
+  if (agedChart) agedChart.destroy();
+  agedChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['0–30 j', '31–60 j', '61–90 j', '90+ j'],
+      datasets: [{ data: [data['0_30'], data['31_60'], data['61_90'], data['over_90']],
+        backgroundColor: ['#10b981', '#f59e0b', '#f97316', '#ef4444'] }],
+    },
+    options: { responsive: true, plugins: { legend: { position: 'bottom' } } },
+  });
+}
+
+async function loadTopClients() {
+  const data = await getJson('/api/reports/top-clients');
+  const body = document.getElementById('top-clients-body');
+  body.innerHTML = '';
+  if (!data.length) { body.innerHTML = '<tr><td colspan="3" class="empty">Aucune donnée</td></tr>'; return; }
+  for (const c of data) {
+    const tr = document.createElement('tr');
+    const name = document.createElement('td'); name.textContent = c.name; name.className = 'font-medium';
+    const rev = document.createElement('td'); rev.className = 'text-right'; rev.textContent = fmt(c.revenue) + ' €';
+    const cnt = document.createElement('td'); cnt.className = 'text-right muted'; cnt.textContent = c.invoice_count;
+    tr.append(name, rev, cnt); body.appendChild(tr);
+  }
+}
+
+async function loadAnomalies() {
+  const data = await getJson('/api/reports/anomalies');
+  const body = document.getElementById('anomalies-body');
+  body.innerHTML = '';
+  if (!data.length) { body.innerHTML = '<tr><td colspan="4" class="empty">Aucune anomalie détectée</td></tr>'; return; }
+  for (const a of data) {
+    const tr = document.createElement('tr');
+    const num = document.createElement('td'); num.textContent = a.number || ('#' + a.invoice_id); num.className = 'font-medium';
+    const amt = document.createElement('td'); amt.className = 'text-right'; amt.textContent = fmt(a.amount) + ' €';
+    const mean = document.createElement('td'); mean.className = 'text-right muted'; mean.textContent = fmt(a.mean_amount) + ' €';
+    const z = document.createElement('td'); z.className = 'text-right'; z.innerHTML = '<span class="badge badge-amber">' + a.z_score + '</span>';
+    tr.append(num, amt, mean, z); body.appendChild(tr);
+  }
+}
+
+async function loadAll() {
+  const year = document.getElementById('year-select').value;
+  try {
+    await Promise.all([loadRevenue(year), loadAged(), loadTopClients(), loadAnomalies()]);
+  } catch (e) {
+    window.toast('Échec du chargement des rapports : ' + e.message, 'error');
+  }
+}
+
+loadAll();
+</script>
+{% endblock %}

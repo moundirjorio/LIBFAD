@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ code }} — LIBFAD</title>
+  <link rel="stylesheet" href="/static/css/tailwind.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/ui.css?v=libfad-studio-2-20260727">
+</head>
+<body class="h-full">
+  <div class="min-h-full flex items-center justify-center p-6">
+    <div class="text-center max-w-md">
+      <div class="text-7xl font-extrabold" style="color: var(--brand, #4f46e5);">{{ code }}</div>
+      <h1 class="text-xl font-semibold mt-4">{{ title }}</h1>
+      <p class="text-sm text-slate-500 mt-2">{{ message }}</p>
+      <div class="mt-6 flex gap-2 justify-center">
+        <a href="/" class="btn btn-primary btn-sm">← Retour à l'accueil</a>
+        <a href="javascript:history.back()" class="btn btn-outline btn-sm">Page précédente</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Fournisseurs — LIBFAD{% endblock %}
+{% block heading %}Fournisseurs{% endblock %}
+{% block header_extra %}
+<button x-data @click="$dispatch('open-supplier')" class="btn btn-primary btn-sm"><i data-lucide="plus"></i> Nouveau fournisseur</button>
+{% endblock %}
+{% block content %}
+
+<div class="card">
+  <div class="overflow-x-auto">
+    <table class="app-table" data-smart data-page-size="15">
+      <thead>
+        <tr><th>Nom</th><th>Email</th><th>Téléphone</th><th>ICE</th><th>Compte par défaut</th><th>Pays</th><th class="text-right" data-no-sort>Actions</th></tr>
+      </thead>
+      <tbody>
+      {% for s in suppliers %}
+        <tr id="sup-{{ s.id }}">
+          <td class="font-semibold">{{ s.name }}</td>
+          <td class="muted">{{ s.email or '—' }}</td>
+          <td class="muted">{{ s.phone or '—' }}</td>
+          <td class="muted">{{ s.ice or '—' }}</td>
+          <td>{% if s.default_account %}<span class="badge badge-slate">{{ s.default_account }}</span>{% else %}—{% endif %}</td>
+          <td class="muted">{{ s.country or '—' }}</td>
+          <td class="text-right"><button class="btn btn-ghost btn-sm text-red-500" onclick="delSupplier(this, {{ s.id }})" title="Supprimer"><i data-lucide="trash-2" style="width:1rem;height:1rem"></i></button></td>
+        </tr>
+      {% else %}
+        <tr data-empty><td colspan="7" class="empty">Aucun fournisseur. Ajoute-en un (Amazon, Microsoft, Orange…).</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modale nouveau fournisseur -->
+<div x-data="{ open:false }" @open-supplier.window="open=true" x-show="open" x-cloak class="modal-backdrop" @keydown.escape.window="open=false" style="display:none">
+  <div class="modal-panel max-w-2xl" @click.outside="open=false">
+    <div class="card-header"><h3 class="font-semibold">Nouveau fournisseur</h3>
+      <button @click="open=false" class="btn btn-ghost btn-icon"><i data-lucide="x"></i></button></div>
+    <form method="post" action="/api/suppliers/form" class="card-pad grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="sm:col-span-2"><label class="label">Nom *</label><input name="name" required class="input" placeholder="ex. Amazon, Microsoft, Orange"></div>
+      <div><label class="label">Email</label><input name="email" type="email" class="input"></div>
+      <div><label class="label">Téléphone</label><input name="phone" class="input"></div>
+      <div><label class="label">ICE</label><input name="ice" class="input"></div>
+      <div><label class="label">N° TVA</label><input name="vat_number" class="input"></div>
+      <div><label class="label">Ville</label><input name="city" class="input"></div>
+      <div><label class="label">Pays</label><select name="country" class="select"><option>MA</option><option>FR</option><option>ES</option><option>US</option></select></div>
+      <div class="sm:col-span-2">
+        <label class="label">Compte comptable d'achat par défaut</label>
+        <input name="default_account" list="sup-acc" class="input" placeholder="ex. 6111">
+        <datalist id="sup-acc">{% for code, nm in accounts %}<option value="{{ code }}">{{ code }} — {{ nm }}</option>{% endfor %}</datalist>
+      </div>
+      <div class="sm:col-span-2 flex justify-end gap-2">
+        <button type="button" @click="open=false" class="btn btn-outline">Annuler</button>
+        <button type="submit" class="btn btn-primary">Créer</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+async function delSupplier(btn, id){
+  if(!confirm('Supprimer ce fournisseur ?')) return;
+  try{
+    const res = await fetch(`/api/suppliers/${id}/delete`, { method:'POST', headers:{'Accept':'application/json'} });
+    if(!res.ok){ const d=await res.json().catch(()=>({})); throw new Error(d.detail||('Erreur '+res.status)); }
+    window.toast('Fournisseur supprimé.', 'success');
+    const r=document.getElementById('sup-'+id); if(r) r.remove();
+  }catch(e){ window.toast('Échec : '+e.message, 'error'); }
+}
+</script>
+{% endblock %}

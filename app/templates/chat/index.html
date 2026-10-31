@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Assistant IA — LIBFAD{% endblock %}
+{% block heading %}Assistant IA{% endblock %}
+{% block content %}
+<div class="card max-w-3xl mx-auto overflow-hidden" x-data="chatApp()">
+  <div class="card-header">
+    <div>
+      <p class="font-semibold flex items-center gap-2">💬 Assistant administratif</p>
+      <p class="text-xs muted mt-0.5">« Quel est mon CA du mois ? » · « Quels clients sont en retard ? » · « Rédige une relance pour FA-2026-00001 »</p>
+    </div>
+  </div>
+
+  <div class="p-5 h-[60vh] overflow-y-auto" id="chatLog">
+    <template x-if="messages.length === 0">
+      <div class="h-full grid place-items-center text-center muted">
+        <div>
+          <div class="text-4xl mb-2">✨</div>
+          <p class="text-sm">Posez votre première question à l'assistant.</p>
+        </div>
+      </div>
+    </template>
+    <template x-for="m in messages" :key="m.id || Math.random()">
+      <div class="mb-4 flex" :class="m.role === 'user' ? 'justify-end' : 'justify-start'">
+        <div class="max-w-[85%]">
+          <p class="text-xs muted mb-1" :class="m.role === 'user' ? 'text-right' : ''" x-text="m.role === 'user' ? 'Vous' : 'LIBFAD'"></p>
+          <div class="rounded-2xl px-4 py-2.5 text-sm whitespace-pre-wrap shadow-sm"
+               :class="m.role === 'user' ? 'text-white' : ''"
+               :style="m.role === 'user' ? 'background: linear-gradient(180deg, var(--brand), var(--brand-strong));' : 'background: var(--surface-hover); color: var(--text);'"
+               x-text="m.content"></div>
+        </div>
+      </div>
+    </template>
+    <div x-show="loading" class="muted text-sm flex items-center gap-1">L'assistant rédige<span class="animate-pulse">…</span></div>
+  </div>
+
+  <form @submit.prevent="send()" class="p-3 flex gap-2" style="border-top: 1px solid var(--border);">
+    <input x-model="input" type="text" placeholder="Tapez votre message…" class="input flex-1" />
+    <button type="submit" class="btn btn-primary">Envoyer</button>
+  </form>
+</div>
+
+<script>
+function chatApp() {
+  return {
+    messages: [],
+    input: '',
+    threadId: null,
+    loading: false,
+    async send() {
+      if (!this.input.trim()) return;
+      const content = this.input;
+      this.messages.push({ role: 'user', content });
+      this.input = '';
+      this.loading = true;
+      try {
+        const res = await fetch('/api/chat/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ content, thread_id: this.threadId })
+        });
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch { data = { detail: text }; }
+        if (!res.ok) {
+          const msg = data.detail || `Erreur HTTP ${res.status}`;
+          this.messages.push({ role: 'assistant', content: '⚠ ' + msg });
+        } else {
+          this.messages.push({ role: 'assistant', content: data.content });
+          if (!this.threadId && data.thread_id) this.threadId = data.thread_id;
+        }
+      } catch (e) {
+        this.messages.push({ role: 'assistant', content: '⚠ Erreur réseau : ' + e.message });
+      }
+      this.loading = false;
+      this.$nextTick(() => {
+        const log = document.getElementById('chatLog');
+        log.scrollTop = log.scrollHeight;
+      });
+    }
+  }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,39 @@
+{% extends "portal/base.html" %}
+{% block title %}Mes factures — Espace client{% endblock %}
+{% set status_label = {'paid':'Payée','overdue':'En retard','sent':'Envoyée','issued':'Émise','partially_paid':'Partiel','cancelled':'Annulée','refunded':'Remboursée'} %}
+{% set status_color = {'paid':'green','overdue':'red','sent':'blue','issued':'indigo','partially_paid':'amber','cancelled':'rose','refunded':'slate'} %}
+{% block content %}
+
+<div class="mb-6">
+  <p class="eyebrow">Facturation</p>
+  <h2 style="font-family:'Manrope',sans-serif; font-size:1.55rem; font-weight:750; letter-spacing:-.035em;">Mes factures</h2>
+</div>
+
+<div class="card">
+  {% if invoices %}
+  <div class="overflow-x-auto">
+    <table class="app-table">
+      <thead>
+        <tr><th>N°</th><th>Date</th><th>Échéance</th><th class="text-right">Total TTC</th><th class="text-right">Restant dû</th><th>Statut</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for inv in invoices %}
+        <tr class="cursor-pointer" onclick="window.location='/portail/factures/{{ inv.id }}'">
+          <td class="font-semibold">{{ inv.number }}</td>
+          <td>{{ inv.issue_date | date_fr(client.locale, 'medium') }}</td>
+          <td>{{ inv.due_date | date_fr(client.locale, 'medium') }}</td>
+          <td class="text-right font-semibold">{{ inv.total_ttc | money(inv.currency, client.locale) }}</td>
+          <td class="text-right {% if inv.amount_due and inv.amount_due > 0 %}text-amber-600{% endif %}">{{ inv.amount_due | money(inv.currency, client.locale) }}</td>
+          <td><span class="badge badge-{{ status_color.get(inv.status, 'slate') }}">{{ status_label.get(inv.status, inv.status) }}</span></td>
+          <td class="text-right"><i data-lucide="chevron-right" class="muted"></i></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">Vous n'avez aucune facture pour le moment.</div>
+  {% endif %}
+</div>
+
+{% endblock %}

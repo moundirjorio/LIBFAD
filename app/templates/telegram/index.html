@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Bot Telegram — LIBFAD{% endblock %}
+{% block heading %}Bot Telegram{% endblock %}
+{% block header_extra %}
+{% if bot_username %}
+<a href="https://t.me/{{ bot_username }}" target="_blank" rel="noopener" class="btn btn-outline btn-sm"><i data-lucide="external-link"></i> Ouvrir @{{ bot_username }}</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% from "components/ui.html" import page_header %}
+{{ page_header('LIBFAD dans Telegram', 'Consultez vos impayés, créez factures et devis, encaissez un paiement ou recevez un PDF depuis votre téléphone.', 'bot') }}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2 space-y-4">
+
+    <!-- Étape 1 : connecter le bot -->
+    <div class="card card-pad">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold">1. Connecter le bot de la société</h3>
+        {% if status %}
+          {% set color = {'running': 'green', 'starting': 'amber', 'error': 'red'}.get(status.state, 'slate') %}
+          <span class="badge badge-{{ color }}">{{ status.detail }}</span>
+        {% else %}
+          <span class="badge badge-slate">Non connecté</span>
+        {% endif %}
+      </div>
+
+      {% if bot_username %}
+        <dl class="text-sm space-y-1 mb-4">
+          <dt class="muted">Bot</dt><dd class="font-semibold">@{{ bot_username }}</dd>
+          <dt class="muted mt-2">Jeton</dt><dd>{{ token_hint }}</dd>
+        </dl>
+      {% else %}
+        <ol class="text-sm space-y-1 mb-4 muted" style="list-style:decimal;padding-left:1.2rem">
+          <li>Dans Telegram, ouvrez <a href="https://t.me/BotFather" target="_blank" rel="noopener" style="color:var(--brand-strong)">@BotFather</a> et envoyez <b>/newbot</b>.</li>
+          <li>Choisissez un nom et un identifiant (il doit finir par « bot »).</li>
+          <li>Copiez le jeton que BotFather vous donne et collez-le ci-dessous.</li>
+        </ol>
+      {% endif %}
+
+      {% if can_manage %}
+        <form method="post" action="/api/telegram/token" class="flex flex-wrap items-end gap-2">
+          <div class="flex-1" style="min-width:16rem">
+            <label class="label">{{ 'Remplacer le jeton' if bot_username else 'Jeton du bot' }}</label>
+            <input name="token" type="password" required autocomplete="off" class="input" placeholder="123456789:AAH…">
+          </div>
+          <button type="submit" class="btn btn-primary">{{ 'Remplacer' if bot_username else 'Connecter' }}</button>
+        </form>
+        {% if bot_username %}
+        <form method="post" action="/api/telegram/disconnect" class="mt-3"
+              onsubmit="return confirm('Déconnecter le bot ? Tous les comptes Telegram reliés seront déliés.')">
+          <button type="submit" class="btn btn-ghost btn-sm text-red-500"><i data-lucide="unplug"></i> Déconnecter le bot</button>
+        </form>
+        {% endif %}
+      {% else %}
+        <p class="text-sm muted">Seul un propriétaire ou administrateur peut connecter ou remplacer le bot.</p>
+      {% endif %}
+    </div>
+
+    <!-- Étape 2 : relier son compte -->
+    <div class="card card-pad">
+      <h3 class="font-semibold mb-1">2. Relier votre compte Telegram</h3>
+      <p class="text-sm muted mb-4">Le bot ne répond qu'aux conversations reliées à un utilisateur LIBFAD. Le code est personnel, à usage unique et valable 15 minutes.</p>
+
+      {% if not bot_username %}
+        <p class="text-sm muted">Connectez d'abord un bot (étape 1).</p>
+      {% elif pending %}
+        <div class="rounded-xl p-4 mb-3" style="border:1px solid var(--border);background:var(--surface-2)">
+          <div class="stat-label">Votre code</div>
+          <div class="text-2xl font-extrabold mt-1" style="letter-spacing:.04em">{{ pending.code }}</div>
+          <p class="text-xs muted mt-1">Expire à {{ pending.code_expires_at.astimezone().strftime('%H:%M') }}.</p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <a href="https://t.me/{{ bot_username }}?start={{ pending.code }}" target="_blank" rel="noopener" class="btn btn-primary btn-sm"><i data-lucide="send"></i> Ouvrir Telegram et relier</a>
+          <button type="button" class="btn btn-outline btn-sm" onclick="copyStart('/start {{ pending.code }}')"><i data-lucide="copy"></i> Copier « /start {{ pending.code }} »</button>
+        </div>
+        <p class="text-xs muted mt-3">Sur ordinateur, ouvrez @{{ bot_username }} dans Telegram et envoyez la commande copiée. Rechargez ensuite cette page.</p>
+      {% else %}
+        <form method="post" action="/api/telegram/link-code" class="flex flex-wrap items-center gap-2">
+          <button type="submit" class="btn btn-primary btn-sm"><i data-lucide="key-round"></i> Générer un code</button>
+          {% if my_link %}<span class="text-sm muted">Votre compte est déjà relié — un nouveau code relie un autre appareil ou compte.</span>{% endif %}
+        </form>
+      {% endif %}
+    </div>
+
+    <!-- Comptes reliés -->
+    <div class="card">
+      <div class="card-header">
+        <h3>Comptes Telegram reliés</h3>
+        {% if my_link %}
+        <form method="post" action="/api/telegram/test">
+          <button type="submit" class="btn btn-outline btn-sm"><i data-lucide="send"></i> Envoyer un message de test</button>
+        </form>
+        {% endif %}
+      </div>
+      <div class="overflow-x-auto">
+        <table class="app-table">
+          <thead><tr><th>Utilisateur LIBFAD</th><th>Compte Telegram</th><th>Relié le</th><th class="text-right">Actions</th></tr></thead>
+          <tbody>
+          {% for row in links %}
+            <tr>
+              <td><span class="font-semibold">{{ row.name }}</span><br><span class="muted text-xs">{{ row.email }}</span></td>
+              <td>{{ row.link.tg_name or '—' }}{% if row.link.tg_username %} <span class="muted">@{{ row.link.tg_username }}</span>{% endif %}</td>
+              <td class="muted">{{ row.link.linked_at.astimezone().strftime('%d/%m/%Y %H:%M') if row.link.linked_at else '—' }}</td>
+              <td class="text-right">
+                {% if can_manage or row.link.user_id == current_user.id %}
+                <form method="post" action="/api/telegram/links/{{ row.link.id }}/delete" onsubmit="return confirm('Délier ce compte Telegram ?')">
+                  <button type="submit" class="btn btn-ghost btn-sm text-red-500" title="Délier"><i data-lucide="unlink" style="width:1rem;height:1rem"></i></button>
+                </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" class="empty">Aucun compte relié pour le moment.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Colonne d'aide -->
+  <div class="lg:col-span-1 space-y-4">
+    <div class="card card-pad">
+      <h3 class="font-semibold mb-3">Ce que fait le bot</h3>
+      <ul class="text-sm space-y-2">
+        <li><b>Consulter</b> — chiffres clés, impayés par client, factures, devis, clients, fournisseurs, achats, trésorerie.</li>
+        <li><b>Créer</b> — factures, devis, clients, fournisseurs et achats, guidé question par question.</li>
+        <li><b>Encaisser</b> — enregistrer un paiement sur une facture.</li>
+        <li><b>Recevoir</b> — le PDF d'une facture ou d'un devis dans la conversation.</li>
+        <li><b>Relancer</b> — message de relance et lien WhatsApp pré-rempli.</li>
+        <li><b>Importer</b> — envoyez un relevé bancaire PDF ou CSV.</li>
+      </ul>
+      <p class="text-xs muted mt-3">La comptabilité (écritures, TVA, états), le rapprochement bancaire et les paramètres restent dans l'interface.</p>
+    </div>
+
+    <div class="card card-pad">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="font-semibold">Langage naturel</h3>
+        <span class="badge badge-{{ 'green' if ai_configured else 'slate' }}">{{ 'Clé Claude configurée' if ai_configured else 'Sans IA' }}</span>
+      </div>
+      <p class="text-sm muted">Avec une clé Claude disposant de crédit, écrivez normalement : « combien me doit Bouygues ? », « facture 3 jours de conseil à 4 000 pour OCP ». Sans IA, le bot fonctionne avec les commandes et les assistants guidés.</p>
+    </div>
+
+    <div class="card card-pad">
+      <h3 class="font-semibold mb-3">Commandes</h3>
+      <dl class="text-sm space-y-1">
+        {% for cmd, desc in commands %}
+        <div class="flex gap-2"><dt class="font-semibold" style="min-width:9.5rem">/{{ cmd }}</dt><dd class="muted">{{ desc }}</dd></div>
+        {% endfor %}
+      </dl>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+{% if flash %}
+window.addEventListener('DOMContentLoaded', function () {
+  window.toast({{ flash[0] | tojson }}, {{ flash[1] | tojson }});
+  history.replaceState(null, '', '/telegram');
+});
+{% endif %}
+function copyStart(text) {
+  navigator.clipboard.writeText(text).then(
+    function () { window.toast('Commande copiée.', 'success'); },
+    function () { window.prompt('Copiez cette commande :', text); }
+  );
+}
+</script>
+{% endblock %}

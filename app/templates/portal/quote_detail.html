@@ -1,0 +1,77 @@
+{% extends "portal/base.html" %}
+{% block title %}Devis {{ quote.number }} — Espace client{% endblock %}
+{% set qstatus_label = {'sent':'À examiner','accepted':'Accepté','refused':'Refusé','expired':'Expiré','converted':'Converti'} %}
+{% set qstatus_color = {'sent':'blue','accepted':'green','refused':'rose','expired':'slate','converted':'indigo'} %}
+{% block content %}
+
+<div class="flex items-center justify-between gap-3 mb-6 flex-wrap">
+  <div>
+    <a href="/portail/devis" class="text-sm muted hover:underline inline-flex items-center gap-1"><i data-lucide="arrow-left"></i> Retour aux devis</a>
+    <h2 class="mt-1" style="font-family:'Manrope',sans-serif; font-size:1.5rem; font-weight:750; letter-spacing:-.03em;">Devis {{ quote.number }}</h2>
+  </div>
+  <span class="badge badge-{{ qstatus_color.get(quote.status, 'slate') }}">{{ qstatus_label.get(quote.status, quote.status) }}</span>
+</div>
+
+{% if quote.status == 'accepted' %}
+<div class="mb-6 p-4 rounded-xl border flex items-center gap-3" style="border-color:var(--border); background:var(--brand-soft)">
+  <i data-lucide="check-circle-2" style="color:var(--brand-strong)"></i>
+  <span class="text-sm font-medium" style="color:var(--brand-strong)">Vous avez accepté ce devis{% if quote.accepted_at %} le {{ quote.accepted_at | date_fr(client.locale) }}{% endif %}.</span>
+</div>
+{% elif quote.status == 'refused' %}
+<div class="mb-6 p-4 rounded-xl border flex items-center gap-3 bg-red-50 dark:bg-red-500/10" style="border-color:var(--border)">
+  <i data-lucide="x-circle" class="text-red-600"></i>
+  <span class="text-sm font-medium text-red-700 dark:text-red-300">Vous avez refusé ce devis.</span>
+</div>
+{% endif %}
+
+<div class="card mb-6">
+  <div class="card-header"><h2 class="text-base font-semibold">Détail</h2>
+    <span class="text-sm muted">Émis le {{ quote.issue_date | date_fr(client.locale) }} · Valable jusqu'au {{ quote.valid_until | date_fr(client.locale) }}</span>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="app-table">
+      <thead>
+        <tr><th>Description</th><th class="text-right">Qté</th><th class="text-right">P.U. HT</th><th class="text-right">TVA</th><th class="text-right">Total TTC</th></tr>
+      </thead>
+      <tbody>
+        {% for it in quote.items %}
+        <tr>
+          <td>{{ it.description }}</td>
+          <td class="text-right">{{ it.quantity | num(client.locale) }} {{ it.unit }}</td>
+          <td class="text-right">{{ it.unit_price | money(quote.currency, client.locale) }}</td>
+          <td class="text-right">{{ it.tax_rate | num(client.locale) }} %</td>
+          <td class="text-right font-semibold">{{ it.line_total_ttc | money(quote.currency, client.locale) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+      <tfoot>
+        <tr><td colspan="4" class="text-right muted">Sous-total HT</td><td class="text-right">{{ quote.subtotal_ht | money(quote.currency, client.locale) }}</td></tr>
+        <tr><td colspan="4" class="text-right muted">TVA</td><td class="text-right">{{ quote.total_tax | money(quote.currency, client.locale) }}</td></tr>
+        <tr><td colspan="4" class="text-right font-bold">Total TTC</td><td class="text-right font-bold">{{ quote.total_ttc | money(quote.currency, client.locale) }}</td></tr>
+      </tfoot>
+    </table>
+  </div>
+  {% if quote.notes_public %}
+  <div class="card-pad border-t" style="border-color:var(--border)"><p class="text-sm muted">{{ quote.notes_public }}</p></div>
+  {% endif %}
+</div>
+
+{% if quote.status in ['sent', 'expired'] %}
+<div class="card card-pad">
+  <h3 class="font-semibold mb-1">Votre décision</h3>
+  <p class="text-sm muted mb-4">Vous pouvez accepter ou refuser ce devis en ligne.</p>
+  <div class="flex items-center gap-3 flex-wrap">
+    <form method="post" action="/portail/devis/{{ quote.id }}/decision">
+      <input type="hidden" name="decision" value="accept">
+      <button type="submit" class="btn btn-primary"><i data-lucide="check"></i> Accepter le devis</button>
+    </form>
+    <form method="post" action="/portail/devis/{{ quote.id }}/decision"
+          onsubmit="return confirm('Confirmer le refus de ce devis ?')">
+      <input type="hidden" name="decision" value="refuse">
+      <button type="submit" class="btn btn-outline"><i data-lucide="x"></i> Refuser</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

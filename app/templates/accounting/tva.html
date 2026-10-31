@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Déclaration TVA — LIBFAD{% endblock %}
+{% block heading %}Déclaration de TVA{% endblock %}
+{% macro money(v) %}{{ '{:,.2f}'.format(v|float).replace(',', ' ').replace('.', ',') }}{% endmacro %}
+{% block content %}
+{% set months = [(0,'Année entière'),(1,'Janvier'),(2,'Février'),(3,'Mars'),(4,'Avril'),(5,'Mai'),(6,'Juin'),(7,'Juillet'),(8,'Août'),(9,'Septembre'),(10,'Octobre'),(11,'Novembre'),(12,'Décembre')] %}
+
+<!-- Sélecteur de période -->
+<form method="get" class="flex items-end gap-3 mb-6 flex-wrap">
+  <div><label class="label">Année</label>
+    <select name="year" class="select" onchange="this.form.submit()">
+      {% for y in range(current_year-4, current_year+1) %}<option value="{{ y }}" {% if y == year %}selected{% endif %}>{{ y }}</option>{% endfor %}
+    </select></div>
+  <div><label class="label">Période</label>
+    <select name="month" class="select" onchange="this.form.submit()">
+      {% for v, lbl in months %}<option value="{{ v }}" {% if (month or 0) == v %}selected{% endif %}>{{ lbl }}</option>{% endfor %}
+    </select></div>
+  <div class="text-sm muted pb-2">Du {{ vr.start.strftime('%d/%m/%Y') }} au {{ vr.end.strftime('%d/%m/%Y') }}</div>
+</form>
+
+<div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+  <div class="stat"><div class="stat-ico"><i data-lucide="arrow-down-left"></i></div>
+    <div class="stat-label">TVA collectée</div><div class="stat-value">{{ money(vr.collectee) }} <span class="text-sm muted">MAD</span></div>
+    <div class="stat-hint">Comptes 4455</div></div>
+  <div class="stat"><div class="stat-ico"><i data-lucide="arrow-up-right"></i></div>
+    <div class="stat-label">TVA déductible</div><div class="stat-value">{{ money(vr.deductible) }}</div>
+    <div class="stat-hint">Comptes 3455</div></div>
+  <div class="stat stat-primary"><div class="stat-ico"><i data-lucide="landmark"></i></div>
+    {% if vr.credit_reportable > 0 %}
+    <div class="stat-label">Crédit de TVA reportable</div><div class="stat-value">{{ money(vr.credit_reportable) }}</div>
+    <div class="stat-hint">À reporter sur la période suivante</div>
+    {% else %}
+    <div class="stat-label">TVA due à payer</div><div class="stat-value">{{ money(vr.due) }}</div>
+    <div class="stat-hint">Collectée − déductible</div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card card-pad">
+  <div class="flex items-center justify-between gap-3 flex-wrap">
+    <div>
+      <h3 class="font-semibold">Liquidation de la TVA</h3>
+      <p class="text-sm muted mt-1">Génère l'écriture de TVA (journal OD) : solde des comptes 4455 et 3455 vers 4456 (TVA due) ou 3456 (crédit).</p>
+    </div>
+    <button class="btn btn-primary" onclick="postVat(this)"><i data-lucide="book-open-text"></i> Comptabiliser la TVA</button>
+  </div>
+</div>
+
+<script>
+async function postVat(btn){
+  const fd = new FormData(); fd.append('year', {{ year }}); fd.append('month', {{ month or 0 }});
+  btn.disabled = true;
+  try{
+    const res = await fetch('/api/accounting/vat/post', { method:'POST', headers:{'Accept':'application/json'}, body: fd });
+    const d = await res.json().catch(()=>({}));
+    if(!res.ok) throw new Error(d.detail || ('Erreur '+res.status));
+    window.toast('Écriture de TVA générée.', 'success');
+    setTimeout(()=>{ window.location.href = '/comptabilite/ecritures'; }, 900);
+  }catch(e){ window.toast('Échec : '+e.message, 'error'); btn.disabled = false; }
+}
+</script>
+{% endblock %}

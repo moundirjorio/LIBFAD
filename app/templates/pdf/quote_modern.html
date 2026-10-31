@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="{{ lang | default('fr') }}">
+<head>
+<meta charset="UTF-8">
+<title>{{ quote.number }}</title>
+{% set brand = brand_color or tenant.primary_color or '#4F46E5' %}
+<style>
+  @page { size: A4; margin: 0 0 22mm 0; }
+  body { font-family: Helvetica, Arial, sans-serif; color: #0f172a; font-size: 10pt; }
+  .pad { padding: 0 16mm; }
+  .muted { color: #64748b; font-size: 9pt; }
+
+  .band { background-color: {{ brand }}; color: #ffffff; }
+  .band-inner { padding: 16mm 16mm 10mm 16mm; }
+  .band .company { font-size: 15pt; font-weight: bold; color: #ffffff; margin: 0; }
+  .band .sub { color: #ffffff; font-size: 8.5pt; margin: 2pt 0 0 0; }
+  .band h1 { font-size: 26pt; margin: 0; color: #ffffff; font-weight: bold; letter-spacing: 1pt; }
+  .band .num { color: #ffffff; font-size: 12pt; margin: 2pt 0 0 0; }
+  .logo { height: 42pt; margin-bottom: 5pt; }
+
+  .cards { width: 100%; border-collapse: collapse; margin-top: 12mm; }
+  .cards td { vertical-align: top; }
+  .card { background-color: #f8fafc; padding: 9pt 11pt; }
+  .card .lbl { color: {{ brand }}; font-size: 7.5pt; font-weight: bold; letter-spacing: .5pt; margin: 0 0 3pt 0; }
+  .card .v { font-size: 9pt; }
+  .card .name { font-weight: bold; font-size: 10pt; }
+
+  .items { width: 100%; border-collapse: collapse; margin-top: 12pt; }
+  .items th { text-align: left; padding: 8pt 8pt; background-color: {{ brand }}; font-size: 8pt; color: #ffffff; font-weight: bold; }
+  .items td { padding: 7pt 8pt; border-bottom: 1px solid #e2e8f0; font-size: 9.5pt; }
+  .items .r, .items th.r { text-align: right; }
+  .items tbody tr:nth-child(even) td { background-color: #f8fafc; }
+
+  .totals { width: 48%; margin-left: 52%; margin-top: 12pt; border-collapse: collapse; }
+  .totals td { padding: 5pt 10pt; font-size: 10pt; }
+  .totals .r { text-align: right; }
+  .totals .sub td { color: #475569; }
+  .totals .total-final td { font-size: 14pt; font-weight: bold; color: #ffffff; background-color: {{ brand }}; }
+
+  .notes { margin-top: 16pt; font-size: 9.5pt; }
+  .notes .lbl { font-weight: bold; color: {{ brand }}; margin-bottom: 2pt; }
+  .legal { margin-top: 14pt; padding: 9pt 11pt; background-color: #f8fafc; border-left: 4px solid {{ brand }}; font-size: 8pt; color: #475569; }
+  .footer { position: fixed; bottom: -16mm; left: 0; right: 0; text-align: center; font-size: 7.5pt; color: #94a3b8; padding-top: 5pt; }
+</style>
+</head>
+<body>
+
+<div class="band">
+  <div class="band-inner">
+    <table width="100%">
+      <tr>
+        <td width="58%">
+          {% if logo_data_uri %}<img src="{{ logo_data_uri }}" class="logo" />{% endif %}
+          <p class="company">{{ tenant.legal_name or tenant.name }}</p>
+          <p class="sub">
+            {{ tenant.address_line1 or '' }} · {{ tenant.postal_code or '' }} {{ tenant.city or '' }} {{ tenant.country or '' }}<br/>
+            {% if tenant.email %}{{ tenant.email }}{% endif %}{% if tenant.phone %} · {{ tenant.phone }}{% endif %}{% if tenant.website %} · {{ tenant.website }}{% endif %}
+          </p>
+        </td>
+        <td width="42%" style="text-align: right;">
+          <h1>{{ t.doc_quote }}</h1>
+          <p class="num"><strong>{{ quote.number }}</strong></p>
+        </td>
+      </tr>
+    </table>
+  </div>
+</div>
+
+<div class="pad">
+  <table class="cards">
+    <tr>
+      <td width="34%" style="padding-right: 8pt;">
+        <div class="card">
+          <p class="lbl">{{ t.issuer }}</p>
+          <p class="v name">{{ tenant.legal_name or tenant.name }}</p>
+          <p class="v muted">
+            {% if tenant.siret %}{{ t.siret }} {{ tenant.siret }}<br/>{% endif %}
+            {% if tenant.vat_number %}{{ t.vat_short }} {{ tenant.vat_number }}{% endif %}{% if tenant.ice %} · ICE {{ tenant.ice }}{% endif %}
+          </p>
+        </div>
+      </td>
+      <td width="34%" style="padding-right: 8pt;">
+        <div class="card">
+          <p class="lbl">{{ t.attention_to }}</p>
+          <p class="v name">{{ client.name }}</p>
+          <p class="v muted">
+            {{ client.billing_address_line1 or '' }}<br/>
+            {{ client.billing_postal_code or '' }} {{ client.billing_city or '' }} {{ client.billing_country or '' }}
+          </p>
+        </div>
+      </td>
+      <td width="32%">
+        <div class="card">
+          <p class="lbl">{{ t.details }}</p>
+          <p class="v">{{ t.issued }} : <strong>{{ quote.issue_date.strftime(t.date_fmt) }}</strong></p>
+          <p class="v">{{ t.valid_until }} : <strong>{{ quote.valid_until.strftime(t.date_fmt) }}</strong></p>
+          <p class="v">{{ t.currency }} : <strong>{{ quote.currency }}</strong></p>
+        </div>
+      </td>
+    </tr>
+  </table>
+
+  <table class="items">
+    <thead>
+      <tr>
+        <th>{{ t.col_desc }}</th>
+        <th class="r">{{ t.qty_short }}</th>
+        <th class="r">{{ t.pu_short }}</th>
+        <th class="r">{{ t.vat_short }}</th>
+        <th class="r">{{ t.col_total }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for it in quote.items %}
+      <tr>
+        <td>{{ it.description }}</td>
+        <td class="r">{{ it.quantity }}</td>
+        <td class="r">{{ '%.2f'|format(it.unit_price|float) }}</td>
+        <td class="r">{{ '%.0f'|format(it.tax_rate|float) }}%</td>
+        <td class="r">{{ '%.2f'|format(it.line_subtotal_ht|float) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <table class="totals">
+    <tr class="sub"><td>{{ t.total_ht }}</td><td class="r">{{ '%.2f'|format(quote.subtotal_ht|float) }} {{ quote.currency }}</td></tr>
+    <tr class="sub"><td>{{ t.vat_short }}</td><td class="r">{{ '%.2f'|format(quote.total_tax|float) }} {{ quote.currency }}</td></tr>
+    <tr class="total-final"><td>{{ t.total_ttc }}</td><td class="r">{{ '%.2f'|format(quote.total_ttc|float) }} {{ quote.currency }}</td></tr>
+  </table>
+
+  {% if quote.notes_public %}
+  <div class="notes">
+    <p class="lbl">{{ t.conditions }}</p>
+    <p style="margin:0;">{{ quote.notes_public }}</p>
+  </div>
+  {% endif %}
+
+  <div class="legal">
+    {{ t.valid_until }} {{ quote.valid_until.strftime(t.date_fmt) }}. {{ t.approval }}.
+    {% if tenant.invoice_footer %}<br/>{{ tenant.invoice_footer }}{% endif %}
+  </div>
+</div>
+
+<div class="footer">
+  {{ tenant.legal_name or tenant.name }}{% if tenant.siret %} · {{ t.siret }} {{ tenant.siret }}{% endif %}{% if tenant.vat_number %} · {{ t.vat_short }} {{ tenant.vat_number }}{% endif %}
+</div>
+
+</body>
+</html>

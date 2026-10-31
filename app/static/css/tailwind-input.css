@@ -1,0 +1,6 @@
+/* Entrée du build Tailwind standalone.
+   Build :  ./tools/tailwindcss.exe -i app/static/css/tailwind-input.css -o app/static/css/tailwind.css --minify
+   Le design system maison reste dans app.css (chargé après). */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;

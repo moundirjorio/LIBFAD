@@ -1,0 +1,38 @@
+{% extends "portal/base.html" %}
+{% block title %}Mes devis — Espace client{% endblock %}
+{% set qstatus_label = {'sent':'À examiner','accepted':'Accepté','refused':'Refusé','expired':'Expiré','converted':'Converti'} %}
+{% set qstatus_color = {'sent':'blue','accepted':'green','refused':'rose','expired':'slate','converted':'indigo'} %}
+{% block content %}
+
+<div class="mb-6">
+  <p class="eyebrow">Commercial</p>
+  <h2 style="font-family:'Manrope',sans-serif; font-size:1.55rem; font-weight:750; letter-spacing:-.035em;">Mes devis</h2>
+</div>
+
+<div class="card">
+  {% if quotes %}
+  <div class="overflow-x-auto">
+    <table class="app-table">
+      <thead>
+        <tr><th>N°</th><th>Date</th><th>Valable jusqu'au</th><th class="text-right">Total TTC</th><th>Statut</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for q in quotes %}
+        <tr class="cursor-pointer" onclick="window.location='/portail/devis/{{ q.id }}'">
+          <td class="font-semibold">{{ q.number }}</td>
+          <td>{{ q.issue_date | date_fr(client.locale, 'medium') }}</td>
+          <td>{{ q.valid_until | date_fr(client.locale, 'medium') }}</td>
+          <td class="text-right font-semibold">{{ q.total_ttc | money(q.currency, client.locale) }}</td>
+          <td><span class="badge badge-{{ qstatus_color.get(q.status, 'slate') }}">{{ qstatus_label.get(q.status, q.status) }}</span></td>
+          <td class="text-right"><i data-lucide="chevron-right" class="muted"></i></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">Vous n'avez aucun devis pour le moment.</div>
+  {% endif %}
+</div>
+
+{% endblock %}

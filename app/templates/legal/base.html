@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ page_title }} — {{ settings.app_name }}</title>
+  <script>(function(){try{var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches))document.documentElement.classList.add('dark');}catch(e){}})();</script>
+  <link rel="stylesheet" href="/static/css/tailwind.css">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/app.css">
+  <script defer src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <style>
+    .legal-wrap { max-width: 800px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem; }
+    .legal-wrap h1 { font-family:'Manrope',sans-serif; font-size:1.9rem; font-weight:800; letter-spacing:-.03em; }
+    .legal-wrap h2 { font-family:'Manrope',sans-serif; font-size:1.15rem; font-weight:700; margin:2rem 0 .6rem; }
+    .legal-wrap p, .legal-wrap li { color: var(--text-muted); line-height: 1.7; font-size: .95rem; }
+    .legal-wrap ul { list-style: disc; padding-left: 1.4rem; margin:.5rem 0; }
+    .legal-wrap a { color: var(--brand-strong); text-decoration: underline; }
+    .legal-note { background: #fef3c7; color:#92400e; border:1px solid #fde68a; border-radius:12px; padding:.9rem 1rem; font-size:.85rem; }
+    html.dark .legal-note { background: rgba(245,158,11,.12); color:#fcd34d; border-color: rgba(245,158,11,.25); }
+  </style>
+</head>
+<body class="h-full">
+  <header class="px-5 py-4 border-b" style="border-color:var(--border)">
+    <div class="legal-wrap flex items-center justify-between" style="padding:0">
+      <a href="/" class="inline-flex items-center gap-2 font-extrabold" style="font-family:'Manrope',sans-serif">
+        <span class="brand-mark brand-mark-sm" style="width:2rem;height:2rem"><i data-lucide="sparkles"></i></span> {{ settings.app_name }}
+      </a>
+      <button onclick="toggleTheme()" title="Changer de thème" aria-label="Changer de thème" class="btn btn-ghost btn-icon">
+        <i data-lucide="sun-moon"></i>
+      </button>
+    </div>
+  </header>
+  <main class="legal-wrap">
+    <p class="text-xs muted mb-2"><a href="/">Accueil</a> · Dernière mise à jour : {{ updated }}</p>
+    <h1>{{ page_title }}</h1>
+    <div class="legal-note my-5">⚠️ Modèle de départ — à faire relire et valider par un juriste avant mise en production.</div>
+    {% block body %}{% endblock %}
+    <hr class="my-8" style="border-color:var(--border)">
+    <nav class="flex flex-wrap gap-4 text-sm">
+      <a href="/legal/mentions">Mentions légales</a>
+      <a href="/legal/cgu">CGU</a>
+      <a href="/legal/cgv">CGV</a>
+      <a href="/legal/confidentialite">Confidentialité</a>
+    </nav>
+  </main>
+  <script>
+    window.toggleTheme=function(){var d=document.documentElement.classList.toggle('dark');try{localStorage.setItem('theme',d?'dark':'light');}catch(e){}if(window.lucide)window.lucide.createIcons();};
+    document.addEventListener('DOMContentLoaded',function(){if(window.lucide)window.lucide.createIcons();});
+  </script>
+</body>
+</html>

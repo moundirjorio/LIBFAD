@@ -1,0 +1,50 @@
+{% extends "portal/base.html" %}
+{% block title %}Mes paiements — Espace client{% endblock %}
+{% block content %}
+
+<div class="mb-6">
+  <p class="eyebrow">Suivi</p>
+  <h2 style="font-family:'Manrope',sans-serif; font-size:1.55rem; font-weight:750; letter-spacing:-.035em;">Mes paiements</h2>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+  <div class="stat">
+    <div class="stat-ico"><i data-lucide="check-check"></i></div>
+    <div class="stat-label">Total réglé</div>
+    <div class="stat-value text-green-600">{{ total_paid | money(client.currency, client.locale) }}</div>
+  </div>
+  <div class="stat">
+    <div class="stat-ico stat-ico-amber"><i data-lucide="wallet"></i></div>
+    <div class="stat-label">Restant dû</div>
+    <div class="stat-value {% if total_due and total_due > 0 %}text-amber-500{% endif %}">{{ total_due | money(client.currency, client.locale) }}</div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header"><h2 class="text-base font-semibold">Historique des paiements</h2></div>
+  {% if payments %}
+  <div class="overflow-x-auto">
+    <table class="app-table">
+      <thead><tr><th>Date</th><th>Facture</th><th>Méthode</th><th>Référence</th><th class="text-right">Montant</th></tr></thead>
+      <tbody>
+        {% for p in payments %}
+        {% set inv = invoices_by_id.get(p.invoice_id) %}
+        <tr>
+          <td>{{ p.paid_on | date_fr(client.locale, 'medium') }}</td>
+          <td>
+            {% if inv %}<a href="/portail/factures/{{ inv.id }}" class="font-semibold" style="color:var(--brand-strong)">{{ inv.number }}</a>{% else %}—{% endif %}
+          </td>
+          <td>{{ p.method }}</td>
+          <td class="muted">{{ p.reference or '—' }}</td>
+          <td class="text-right font-semibold text-green-600">{{ p.amount | money(p.currency, client.locale) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">Aucun paiement enregistré pour le moment.</div>
+  {% endif %}
+</div>
+
+{% endblock %}

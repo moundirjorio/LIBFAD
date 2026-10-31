@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual env
+.venv/
+venv/
+env/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project
+storage/
+uploads/
+*.log
+*.sqlite3
+*.db
+
+# Build tools (binaire Tailwind standalone ~40 Mo, à retélécharger si besoin)
+tools/
+
+# Alembic
+# (keep versions/ but ignore generated artifacts)
+
+# Fichiers de travail locaux
+.coverage
+tmp/
+output/
+/*.html
+# Transcription de réunion (contenu privé)
+reunion_transcription.txt

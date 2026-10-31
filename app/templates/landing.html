@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ settings.app_name }} — La gestion & facturation intelligente</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <script defer src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <style>
+    :root{
+      --violet:#5955f4; --violet-2:#817cff; --violet-dark:#292551; --violet-soft:#efefff;
+      --ink:#272944; --muted:#686b85; --line:#e8e8f2; --bg:#ffffff; --bg-soft:#f7f7ff;
+      --pink:#ff7193; --orange:#ff875f; --green:#46cdb5; --blue:#6095ff; --yellow:#ffd260;
+      --radius:28px;
+    }
+    *{box-sizing:border-box; margin:0; padding:0}
+    html{scroll-behavior:smooth}
+    body{font-family:'DM Sans',system-ui,sans-serif; color:var(--ink); background:var(--bg); line-height:1.6; -webkit-font-smoothing:antialiased}
+    h1,h2,h3,.font-display{font-family:'Manrope',system-ui,sans-serif; letter-spacing:-.03em; line-height:1.1}
+    a{color:inherit; text-decoration:none}
+    .wrap{max-width:1360px; margin:0 auto; padding:0 28px}
+    .btn{display:inline-flex; align-items:center; gap:.5rem; font-family:'Manrope',sans-serif; font-weight:700; font-size:.95rem;
+      padding:.8rem 1.4rem; border-radius:999px; border:2px solid transparent; cursor:pointer; transition:.18s; white-space:nowrap}
+    .btn-primary{background:var(--violet); color:#fff; box-shadow:0 10px 24px -8px rgba(109,92,255,.55)}
+    .btn-primary:hover{background:#5b49f0; transform:translateY(-1px)}
+    .btn-ghost{color:var(--ink); border-color:var(--line); background:#fff}
+    .btn-ghost:hover{border-color:var(--violet); color:var(--violet)}
+    .btn-lg{padding:1rem 1.8rem; font-size:1.05rem}
+    .eyebrow{display:inline-flex; align-items:center; gap:.5rem; font-family:'Manrope',sans-serif; font-weight:700; font-size:.78rem;
+      text-transform:uppercase; letter-spacing:.08em; color:var(--violet); background:var(--violet-soft); padding:.4rem .85rem; border-radius:999px}
+
+    /* NAV */
+    .nav{position:sticky; top:0; z-index:50; background:rgba(255,255,255,.85); backdrop-filter:saturate(160%) blur(12px); border-bottom:1px solid var(--line)}
+    .nav-inner{display:flex; align-items:center; justify-content:space-between; height:84px}
+    .brand{display:flex; align-items:center; gap:.6rem; font-family:'Manrope',sans-serif; font-weight:800; font-size:1.25rem}
+    .brand-mark{width:38px; height:38px; border-radius:12px; background:conic-gradient(from 20deg,var(--orange),var(--yellow),var(--green),var(--violet),var(--pink),var(--orange)); display:grid; place-items:center; color:#fff; box-shadow:0 8px 20px -10px rgba(89,85,244,.6)}
+    .nav-links{display:flex; align-items:center; gap:2rem}
+    .nav-links a.lnk{font-weight:600; color:var(--muted)}
+    .nav-links a.lnk:hover{color:var(--ink)}
+    @media(max-width:820px){ .nav-links .lnk{display:none} }
+
+    /* HERO */
+    .hero{position:relative; isolation:isolate; overflow:hidden; padding:78px 0 94px; min-height:calc(100vh - 84px); display:flex; align-items:center; background:radial-gradient(circle at 92% 5%,rgba(255,255,255,.65) 0 18%,transparent 18.2%),linear-gradient(125deg,#fff6d8 0%,#ffe2c8 48%,#ffd2c4 100%)}
+    .hero::before{content:""; position:absolute; width:520px; height:520px; border-radius:50%; right:-160px; top:-220px; background:rgba(255,255,255,.45); z-index:-1}
+    .hero::after{content:""; position:absolute; width:280px; height:280px; border-radius:50%; left:-130px; bottom:-170px; background:rgba(255,113,147,.13); z-index:-1}
+    .hero-grid{display:grid; grid-template-columns:minmax(430px,.82fr) minmax(590px,1.18fr); gap:72px; align-items:center}
+    @media(max-width:1050px){ .hero{min-height:auto}.hero-grid{grid-template-columns:1fr; gap:44px}.product-stage{width:min(760px,100%);margin:auto} }
+    .hero h1{font-size:clamp(3.25rem,4.35vw,5rem); line-height:1.01; letter-spacing:-.055em; max-width:10.7ch; font-weight:800; margin:22px 0 20px}
+    .hero h1 .hl{color:var(--violet); background:none}
+    .hero p.lead{font-size:1.18rem; line-height:1.7; color:var(--muted); max-width:43ch; margin-bottom:30px}
+    .hero-cta{display:flex; gap:14px; flex-wrap:wrap; align-items:center}
+    .hero-note{margin-top:16px; font-size:.9rem; color:var(--muted); display:flex; align-items:center; gap:.5rem}
+
+    /* product preview */
+    .product-stage{position:relative;padding:36px 4px 34px 22px}
+    .product-stage::before{content:"";position:absolute;inset:4% 3% 1% 8%;border-radius:44px;background:rgba(255,255,255,.38);transform:rotate(2deg)}
+    .mock{position:relative;z-index:2;background:#fff;border:1px solid rgba(32,34,63,.12);border-radius:26px;overflow:hidden;box-shadow:0 38px 80px rgba(43,37,91,.22),0 8px 20px rgba(43,37,91,.1);transform:rotate(-1deg)}
+    .mock-top{height:48px;display:flex;align-items:center;gap:7px;padding:0 18px;background:#fbfbfe;border-bottom:1px solid #ececf5}
+    .dot{width:10px;height:10px;border-radius:50%}.mock-url{margin-left:16px;width:42%;height:22px;border-radius:8px;background:#f0f0f8}.mock-avatar{margin-left:auto;width:25px;height:25px;border-radius:9px;background:linear-gradient(135deg,#625cff,#ff7a66)}
+    .mock-shell{display:grid;grid-template-columns:86px 1fr;min-height:440px}.mock-side{padding:20px 14px;background:#292945;color:#fff}
+    .mini-logo{width:34px;height:34px;margin:0 auto 26px;border-radius:11px;background:linear-gradient(135deg,#625cff,#ff7a66 62%,#ffd85e);display:grid;place-items:center;font-weight:900}
+    .mini-nav{width:42px;height:42px;margin:0 auto 10px;border-radius:12px;display:grid;place-items:center;color:#aaaac2}.mini-nav.active{background:#5d58f5;color:#fff;box-shadow:0 8px 18px rgba(93,88,245,.35)}
+    .mock-main{padding:24px 25px 22px;background:#f8f8fc}.mock-heading{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.mock-heading small{display:block;color:#8a8ba1;font-size:.62rem;margin-bottom:4px}.mock-heading strong{font-size:1.05rem;color:#242540}
+    .mini-button{border:0;border-radius:10px;background:#5d58f5;color:#fff;font:700 .68rem Manrope;padding:10px 13px}
+    .mock-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:13px}.mock-card{background:#fff;border:1px solid #e7e7f0;border-radius:14px;padding:13px}.mock-card small{color:#8a8ba1;font-size:.57rem;font-weight:750}.mock-card strong{display:block;font-size:1rem;color:#242540;margin-top:6px}.mock-card strong.violet{color:#5d58f5}.mock-card strong.coral{color:#f27561}
+    .mock-content{display:grid;grid-template-columns:1.35fr .85fr;gap:12px}.chart-card,.invoice-card{background:#fff;border:1px solid #e7e7f0;border-radius:15px;padding:15px}.card-title{display:flex;justify-content:space-between;align-items:center;font-size:.69rem;font-weight:800;color:#343550;margin-bottom:14px}.card-title span{font-size:.52rem;color:#9394a8;font-weight:650}
+    .bars{display:flex;align-items:flex-end;gap:8px;height:155px;border-bottom:1px solid #ececf3;background:repeating-linear-gradient(to bottom,#fff 0,#fff 37px,#f1f1f6 38px)}.bars span{flex:1;border-radius:5px 5px 0 0;background:linear-gradient(180deg,#5d58f5,#8a85ff)}
+    .invoice-row{display:grid;grid-template-columns:28px 1fr auto;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid #f0f0f5}.invoice-row:last-child{border-bottom:0}.invoice-icon{width:27px;height:27px;border-radius:8px;background:#efefff;color:#5d58f5;display:grid;place-items:center;font-size:.65rem;font-weight:900}.invoice-row b{font-size:.57rem;color:#38394e;display:block}.invoice-row small{font-size:.48rem;color:#9a9bae}.invoice-row em{font-size:.54rem;font-style:normal;font-weight:800;color:#38aa73}
+    .float-card{position:absolute;z-index:3;background:#fff;border:1px solid rgba(57,55,95,.09);border-radius:15px;box-shadow:0 18px 36px rgba(54,48,94,.17);display:flex;align-items:center;gap:10px;padding:12px 15px;color:#35364d;font-size:.67rem;font-weight:750}.float-card i{width:29px;height:29px;border-radius:9px;display:grid;place-items:center;font-style:normal}.float-card strong{display:block;font-size:.78rem;color:#242540}.float-paid{right:-18px;top:5px}.float-paid i{background:#eaf9f1;color:#29a268}.float-ai{left:-10px;bottom:2px}.float-ai i{background:#efefff;color:#5d58f5}
+    @media(max-width:650px){.hero{padding:58px 0}.hero h1{font-size:clamp(2.8rem,14vw,4.1rem)}.mock{transform:none}.mock-shell{grid-template-columns:62px 1fr}.mock-side{padding:16px 8px}.mock-main{padding:18px 14px}.mock-cards{grid-template-columns:1fr 1fr}.mock-card:last-child{display:none}.mock-content{grid-template-columns:1fr}.invoice-card,.float-card{display:none}}
+
+    /* TRUST */
+    .trust{border:0; background:#fff}
+    .trust-inner{display:flex; flex-wrap:wrap; gap:14px 40px; justify-content:center; padding:22px 0}
+    .trust-item{display:flex; align-items:center; gap:.5rem; font-weight:600; color:var(--muted); font-size:.95rem}
+    .trust-item svg{color:var(--green)}
+
+    /* SECTION */
+    section.blk{padding:104px 0}
+    .sec-head{text-align:center; max-width:640px; margin:0 auto 52px}
+    .sec-head h2{font-size:clamp(1.9rem,3.6vw,2.6rem); font-weight:800; margin:16px 0 12px}
+    .sec-head p{color:var(--muted); font-size:1.1rem}
+
+    /* FEATURES */
+    .feat-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:22px}
+    @media(max-width:900px){ .feat-grid{grid-template-columns:1fr 1fr} }
+    @media(max-width:600px){ .feat-grid{grid-template-columns:1fr} }
+    .feat{background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:30px; transition:.2s; box-shadow:0 10px 35px rgba(58,55,132,.045)}
+    .feat:hover{transform:translateY(-4px); box-shadow:0 24px 50px -24px rgba(23,19,38,.18); border-color:transparent}
+    .feat .ico{width:52px; height:52px; border-radius:15px; display:grid; place-items:center; color:#fff; margin-bottom:16px}
+    .feat h3{font-size:1.2rem; font-weight:700; margin-bottom:8px}
+    .feat p{color:var(--muted); font-size:.97rem}
+
+    /* PRICING */
+    .price-wrap{background:var(--bg-soft)}
+    .price-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:22px; align-items:stretch}
+    @media(max-width:860px){ .price-grid{grid-template-columns:1fr; max-width:420px; margin:0 auto} }
+    .price{background:#fff; border:1px solid var(--line); border-radius:var(--radius); padding:30px; display:flex; flex-direction:column}
+    .price.featured{border:2px solid var(--violet); box-shadow:0 30px 60px -28px rgba(109,92,255,.45); position:relative}
+    .price .tag{position:absolute; top:-13px; left:50%; transform:translateX(-50%); background:var(--violet); color:#fff; font-size:.72rem; font-weight:700; padding:.3rem .8rem; border-radius:999px; font-family:'Manrope',sans-serif}
+    .price h3{font-family:'Manrope',sans-serif; font-weight:800; font-size:1.3rem}
+    .price .amt{font-family:'Manrope',sans-serif; font-weight:800; font-size:2.4rem; margin:8px 0 2px}
+    .price .amt small{font-size:.95rem; color:var(--muted); font-weight:600}
+    .price ul{list-style:none; margin:20px 0; display:flex; flex-direction:column; gap:12px; flex:1}
+    .price li{display:flex; align-items:flex-start; gap:.6rem; font-size:.96rem}
+    .price li svg{color:var(--green); flex-shrink:0; margin-top:3px}
+
+    /* CTA */
+    .cta{padding:80px 0}
+    .cta-box{background:linear-gradient(130deg,var(--violet),var(--violet-2)); border-radius:28px; padding:56px; text-align:center; color:#fff;
+      box-shadow:0 40px 80px -30px rgba(109,92,255,.6)}
+    .cta-box h2{font-size:clamp(1.8rem,3.4vw,2.5rem); font-weight:800; margin-bottom:14px}
+    .cta-box p{opacity:.92; font-size:1.15rem; margin-bottom:28px}
+    .cta-box .btn-white{background:#fff; color:var(--violet)}
+    .cta-box .btn-white:hover{transform:translateY(-1px)}
+
+    /* FOOTER */
+    footer{border-top:1px solid var(--line); padding:48px 0 32px; color:var(--muted)}
+    .foot-grid{display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px}
+    .foot-links{display:flex; flex-wrap:wrap; gap:8px 20px}
+    .foot-links a:hover{color:var(--violet)}
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="nav">
+    <div class="wrap nav-inner">
+      <a href="/" class="brand"><span class="brand-mark"><i data-lucide="sparkles"></i></span>{{ settings.app_name }}</a>
+      <div class="nav-links">
+        <a href="#fonctionnalites" class="lnk">Fonctionnalités</a>
+        <a href="#tarifs" class="lnk">Tarifs</a>
+        <a href="/login" class="lnk">Se connecter</a>
+        <a href="/register" class="btn btn-primary">Essai gratuit</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <header class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <span class="eyebrow"><i data-lucide="calculator" style="width:1rem;height:1rem"></i> Pensé pour les experts-comptables</span>
+        <h1>Votre cabinet et vos clients, <span class="hl">sur une seule plateforme.</span></h1>
+        <p class="lead">Facturation, relances et portail dédié pour chacun de vos clients. LIBFAD automatise l'administratif pour que vous vous concentriez sur le conseil.</p>
+        <div class="hero-cta">
+          <a href="/register" class="btn btn-primary btn-lg">Démarrer gratuitement <i data-lucide="arrow-right" style="width:1.1rem;height:1.1rem"></i></a>
+          <a href="/login" class="btn btn-ghost btn-lg">J'ai déjà un compte</a>
+        </div>
+        <div class="hero-note"><i data-lucide="check-circle-2" style="width:1.05rem;height:1.05rem;color:var(--green)"></i> 14 jours d'essai · sans carte bancaire</div>
+      </div>
+
+      <!-- product preview -->
+      <div class="product-stage">
+        <div class="float-card float-paid"><i>✓</i><span>Facture encaissée<strong>12 500 MAD</strong></span></div>
+        <div class="float-card float-ai"><i>✦</i><span>Assistant LIBFAD<strong>Relance envoyée</strong></span></div>
+        <div class="mock">
+          <div class="mock-top"><span class="dot" style="background:#ff5f57"></span><span class="dot" style="background:#febc2e"></span><span class="dot" style="background:#28c840"></span><span class="mock-url"></span><span class="mock-avatar"></span></div>
+          <div class="mock-shell">
+            <aside class="mock-side"><div class="mini-logo">✦</div><div class="mini-nav active">⌂</div><div class="mini-nav">▤</div><div class="mini-nav">◇</div><div class="mini-nav">◎</div></aside>
+            <div class="mock-main">
+              <div class="mock-heading"><div><small>Lundi 27 juillet</small><strong>Bonjour Amine 👋</strong></div><button class="mini-button">+ Nouvelle facture</button></div>
+              <div class="mock-cards">
+                <div class="mock-card"><small>CHIFFRE D'AFFAIRES</small><strong class="violet">50 304 MAD</strong></div>
+                <div class="mock-card"><small>À ENCAISSER</small><strong class="coral">29 700 MAD</strong></div>
+                <div class="mock-card"><small>FACTURES PAYÉES</small><strong>24</strong></div>
+              </div>
+              <div class="mock-content">
+                <div class="chart-card"><div class="card-title">Votre activité <span>12 derniers mois</span></div><div class="bars"><span style="height:22%"></span><span style="height:38%"></span><span style="height:52%"></span><span style="height:76%"></span><span style="height:100%"></span><span style="height:48%"></span><span style="height:65%"></span><span style="height:35%"></span></div></div>
+                <div class="invoice-card">
+                  <div class="card-title">Dernières factures <span>Voir tout</span></div>
+                  <div class="invoice-row"><span class="invoice-icon">F</span><span><b>Atlas Studio</b><small>FAC-2026-042</small></span><em>Payée</em></div>
+                  <div class="invoice-row"><span class="invoice-icon">F</span><span><b>Nova Conseil</b><small>FAC-2026-041</small></span><em>Payée</em></div>
+                  <div class="invoice-row"><span class="invoice-icon">D</span><span><b>Riad &amp; Co.</b><small>DEV-2026-019</small></span><em style="color:#f27561">Envoyé</em></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- TRUST -->
+  <div class="trust">
+    <div class="wrap trust-inner">
+      <div class="trust-item"><i data-lucide="shield-check" style="width:1.1rem;height:1.1rem"></i> Conforme Maroc (ICE, RC, TVA)</div>
+      <div class="trust-item"><i data-lucide="folder-kanban" style="width:1.1rem;height:1.1rem"></i> Tous vos clients au même endroit</div>
+      <div class="trust-item"><i data-lucide="users" style="width:1.1rem;height:1.1rem"></i> Un portail dédié par client</div>
+      <div class="trust-item"><i data-lucide="lock" style="width:1.1rem;height:1.1rem"></i> Données sécurisées</div>
+    </div>
+  </div>
+
+  <!-- FEATURES -->
+  <section class="blk" id="fonctionnalites">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Pour votre cabinet</span>
+        <h2>Tout ce qu'il faut pour piloter vos clients</h2>
+        <p>Une plateforme unique pour la facturation, le suivi et la relation client — sans tableur ni allers-retours.</p>
+      </div>
+      <div class="feat-grid">
+        {% set feats = [
+          ('receipt-text','Devis & factures','Émettez pour vos clients des documents conformes en quelques secondes : numérotation et PDF automatiques.','var(--violet)'),
+          ('send','Relances automatiques','Les impayés de vos clients se relancent tout seuls, au bon moment — sans que vous ayez à y penser.','var(--pink)'),
+          ('user-round','Portail dédié par client','Chaque client dispose de son espace sécurisé pour consulter, télécharger et régler ses factures.','var(--blue)'),
+          ('scan-text','Lecture des justificatifs','Numérisez les pièces : l\'OCR extrait montants et informations et les classe pour vous.','var(--orange)'),
+          ('sparkles','Assistant IA','Un assistant qui rédige les relances et évalue la solvabilité des clients de votre portefeuille.','var(--green)'),
+          ('chart-no-axes-combined','Tableau de bord','Trésorerie, balance âgée et encours par client : le pilotage de votre cabinet en temps réel.','var(--violet-2)')
+        ] %}
+        {% for icon,title,desc,color in feats %}
+        <div class="feat">
+          <div class="ico" style="background:{{ color }}"><i data-lucide="{{ icon }}"></i></div>
+          <h3>{{ title }}</h3>
+          <p>{{ desc }}</p>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING -->
+  <section class="blk price-wrap" id="tarifs">
+    <div class="wrap">
+      <div class="sec-head">
+        <span class="eyebrow">Tarifs</span>
+        <h2>Un prix simple, sans surprise</h2>
+        <p>Commencez gratuitement, passez à la vitesse supérieure quand vous êtes prêt.</p>
+      </div>
+      <div class="price-grid">
+        {% for plan in plans %}
+        <div class="price {% if plan.code == 'pro' %}featured{% endif %}">
+          {% if plan.code == 'pro' %}<span class="tag">Le plus populaire</span>{% endif %}
+          <h3>{{ plan.name }}</h3>
+          <div class="amt">{{ plan.price_month }} <small>MAD/mois</small></div>
+          <p style="color:var(--muted); font-size:.9rem">{% if plan.price_month == 0 %}Pour démarrer{% else %}Facturé mensuellement{% endif %}</p>
+          <ul>
+            {% for f in plan.features %}
+            <li><i data-lucide="check" style="width:1.05rem;height:1.05rem"></i> {{ f }}</li>
+            {% endfor %}
+          </ul>
+          <a href="/register" class="btn {% if plan.code == 'pro' %}btn-primary{% else %}btn-ghost{% endif %}" style="justify-content:center">Choisir {{ plan.name }}</a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta">
+    <div class="wrap">
+      <div class="cta-box">
+        <h2>Prêt à simplifier la gestion de votre cabinet ?</h2>
+        <p>Rejoignez les experts-comptables qui ont dit adieu à la paperasse.</p>
+        <a href="/register" class="btn btn-white btn-lg">Créer mon compte gratuit <i data-lucide="arrow-right" style="width:1.1rem;height:1.1rem"></i></a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="wrap foot-grid">
+      <a href="/" class="brand" style="font-size:1.1rem"><span class="brand-mark" style="width:32px;height:32px"><i data-lucide="sparkles" style="width:1rem;height:1rem"></i></span>{{ settings.app_name }}</a>
+      <div class="foot-links">
+        <a href="#fonctionnalites">Fonctionnalités</a>
+        <a href="#tarifs">Tarifs</a>
+        <a href="/legal/mentions">Mentions légales</a>
+        <a href="/legal/cgu">CGU</a>
+        <a href="/legal/confidentialite">Confidentialité</a>
+        <a href="/login">Se connecter</a>
+      </div>
+    </div>
+    <div class="wrap" style="margin-top:20px; font-size:.85rem">© {{ settings.app_name }} — La plateforme de gestion des experts-comptables.</div>
+  </footer>
+
+  <script>document.addEventListener('DOMContentLoaded',function(){if(window.lucide)window.lucide.createIcons({attrs:{'stroke-width':1.9}});});</script>
+</body>
+</html>

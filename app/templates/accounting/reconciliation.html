@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Rapprochement bancaire — LIBFAD{% endblock %}
+{% block heading %}Rapprochement bancaire{% endblock %}
+{% macro money(v) %}{{ '{:,.2f}'.format(v|float).replace(',', ' ').replace('.', ',') }}{% endmacro %}
+{% block header_extra %}
+<a href="/banque" class="btn btn-outline btn-sm"><i data-lucide="arrow-left"></i> Trésorerie</a>
+{% endblock %}
+{% block content %}
+
+<p class="text-sm muted mb-5">
+  LIBFAD compare automatiquement les <b>encaissements</b> de tes relevés avec tes <b>factures impayées</b>.
+  {% if matched %}<b>{{ matched }}</b> correspondance(s) trouvée(s) — vérifie puis rapproche.{% endif %}
+</p>
+
+<div class="card">
+  <div class="overflow-x-auto">
+    <table class="app-table">
+      <thead>
+        <tr>
+          <th>Date</th><th>Libellé de l'opération</th><th class="text-right">Montant</th>
+          <th>Facture suggérée</th><th class="text-right" data-no-sort>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for s in suggestions %}
+        <tr id="tx-{{ s.tx.id }}">
+          <td class="muted">{{ s.tx.op_date.strftime('%d/%m/%Y') }}</td>
+          <td>{{ s.tx.label }}</td>
+          <td class="text-right font-semibold text-green-600">{{ money(s.tx.amount) }}</td>
+          <td>
+            {% if s.invoice %}
+              <a href="/invoices/{{ s.invoice.id }}" class="font-semibold" style="color:var(--brand-strong)">{{ s.invoice.number }}</a>
+              <span class="muted"> · {{ s.client.name if s.client else '' }} · dû {{ money(s.invoice.amount_due) }}</span>
+              {% if s.score >= 100 %}<span class="badge badge-green ml-1">montant exact</span>
+              {% else %}<span class="badge badge-amber ml-1">à vérifier</span>{% endif %}
+            {% else %}
+              <span class="muted">Aucune correspondance automatique</span>
+            {% endif %}
+          </td>
+          <td class="text-right">
+            {% if s.invoice %}
+            <button class="btn btn-primary btn-sm" onclick="matchTx(this, {{ s.tx.id }}, {{ s.invoice.id }})">
+              <i data-lucide="link" style="width:.9rem;height:.9rem"></i> Rapprocher
+            </button>
+            {% else %}
+            <span class="muted text-xs">—</span>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="empty">Aucun encaissement à rapprocher. Importe un relevé bancaire depuis la Trésorerie.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+async function matchTx(btn, txId, invoiceId) {
+  btn.disabled = true;
+  const fd = new FormData(); fd.append('invoice_id', invoiceId);
+  try {
+    const res = await fetch(`/api/bank/transactions/${txId}/match`, { method: 'POST', headers: { 'Accept': 'application/json' }, body: fd });
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.detail || ('Erreur ' + res.status));
+    window.toast('Rapproché — facture ' + d.invoice + ' : ' + d.status + '.', 'success');
+    const row = document.getElementById('tx-' + txId); if (row) row.remove();
+  } catch (e) { window.toast('Échec : ' + e.message, 'error'); btn.disabled = false; }
+}
+</script>
+{% endblock %}

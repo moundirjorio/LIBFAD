@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Abonnement — LIBFAD{% endblock %}
+{% block heading %}Abonnement{% endblock %}
+{% block content %}
+<div class="max-w-4xl space-y-6">
+
+  <div class="card card-pad">
+    <div class="flex items-center justify-between gap-3 flex-wrap">
+      <div>
+        <p class="eyebrow">Votre offre</p>
+        <h3 class="text-xl font-bold mt-1">Plan {{ current_plan.name }}
+          {% if in_trial %}<span class="badge badge-amber ml-2">Essai en cours</span>
+          {% elif tenant.plan_status == 'active' %}<span class="badge badge-green ml-2">Actif</span>
+          {% elif tenant.plan_status == 'past_due' %}<span class="badge badge-red ml-2">Paiement en retard</span>
+          {% endif %}
+        </h3>
+        {% if in_trial and tenant.trial_ends_at %}
+        <p class="text-sm muted mt-1">Essai gratuit jusqu'au {{ tenant.trial_ends_at.strftime('%d/%m/%Y') }}.</p>
+        {% endif %}
+      </div>
+      <div class="text-right">
+        <div class="text-2xl font-extrabold">{{ current_plan.price_month }} <span class="text-sm muted">MAD/mois</span></div>
+      </div>
+    </div>
+
+    <!-- Consommation -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-5">
+      {% set cli_pct = 100 if max_clients and usage.clients >= max_clients else (usage.clients / max_clients * 100) if max_clients else 0 %}
+      <div>
+        <div class="flex justify-between text-sm mb-1"><span class="muted">Clients</span>
+          <span class="font-semibold">{{ usage.clients }}{% if max_clients %} / {{ max_clients }}{% else %} / ∞{% endif %}</span></div>
+        <div class="h-2 rounded-full overflow-hidden" style="background:var(--surface-hover)">
+          <div class="h-full" style="width: {{ cli_pct }}%; background: {% if cli_pct >= 100 %}#ef4444{% else %}var(--brand){% endif %};"></div>
+        </div>
+      </div>
+      {% set inv_pct = 100 if max_invoices and usage.invoices_month >= max_invoices else (usage.invoices_month / max_invoices * 100) if max_invoices else 0 %}
+      <div>
+        <div class="flex justify-between text-sm mb-1"><span class="muted">Factures ce mois</span>
+          <span class="font-semibold">{{ usage.invoices_month }}{% if max_invoices %} / {{ max_invoices }}{% else %} / ∞{% endif %}</span></div>
+        <div class="h-2 rounded-full overflow-hidden" style="background:var(--surface-hover)">
+          <div class="h-full" style="width: {{ inv_pct }}%; background: {% if inv_pct >= 100 %}#ef4444{% else %}var(--brand){% endif %};"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Offres -->
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    {% for plan in plans %}
+    <div class="card card-pad flex flex-col {% if plan.code == current_plan.code %}ring-2 ring-brand-500{% endif %}">
+      <h3 class="font-bold text-lg">{{ plan.name }}</h3>
+      <div class="text-2xl font-extrabold mt-1">{{ plan.price_month }} <span class="text-sm muted font-normal">MAD/mois</span></div>
+      <ul class="mt-4 space-y-2 text-sm flex-1">
+        {% for f in plan.features %}
+        <li class="flex items-start gap-2"><i data-lucide="check" class="text-green-500 mt-0.5 shrink-0" style="width:1rem;height:1rem"></i><span>{{ f }}</span></li>
+        {% endfor %}
+      </ul>
+      {% if plan.code == current_plan.code %}
+      <button class="btn btn-outline w-full mt-4" disabled>Offre actuelle</button>
+      {% elif plan.price_month > current_plan.price_month %}
+      <button class="btn btn-primary w-full mt-4" onclick="upgrade('{{ plan.code }}')">Passer à {{ plan.name }}</button>
+      {% else %}
+      <button class="btn btn-ghost w-full mt-4" onclick="upgrade('{{ plan.code }}')">Choisir {{ plan.name }}</button>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  <p class="text-xs muted text-center">Le paiement récurrent par carte (Stripe) sera activé prochainement. En attendant, contacte-nous pour changer d'offre.</p>
+</div>
+
+<script>
+async function upgrade(code) {
+  try {
+    const res = await fetch('/api/billing/checkout', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ plan: code })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.checkout_url) { window.location.href = data.checkout_url; return; }
+    window.toast(data.detail || 'Le paiement en ligne n\'est pas encore configuré. Contacte-nous pour changer d\'offre.', 'info');
+  } catch (e) { window.toast('Erreur : ' + e.message, 'error'); }
+}
+</script>
+{% endblock %}

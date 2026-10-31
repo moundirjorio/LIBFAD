@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Trésorerie — LIBFAD{% endblock %}
+{% block heading %}Trésorerie{% endblock %}
+{% macro money(v) %}{{ '{:,.2f}'.format(v|float).replace(',', ' ').replace('.', ',') }}{% endmacro %}
+{% block header_extra %}
+<a href="/banque/rapprochement" class="btn btn-outline btn-sm"><i data-lucide="link"></i> Rapprochement</a>
+{% if selected %}
+<label class="btn btn-outline btn-sm cursor-pointer">
+  <i data-lucide="upload"></i> Importer un relevé
+  <input type="file" accept=".csv,text/csv,.pdf,application/pdf" class="hidden" onchange="importStatement(this, {{ selected.id }})">
+</label>
+{% endif %}
+<button class="btn btn-primary btn-sm" x-data @click="$dispatch('open-account')"><i data-lucide="plus"></i> Compte</button>
+{% endblock %}
+{% block content %}
+
+<!-- Synthèse trésorerie -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+  <div class="stat"><div class="stat-ico"><i data-lucide="landmark"></i></div>
+    <div class="stat-label">Solde total</div><div class="stat-value">{{ money(summary.total_balance) }} <span class="text-sm muted">MAD</span></div></div>
+  <div class="stat"><div class="stat-ico"><i data-lucide="arrow-down-left"></i></div>
+    <div class="stat-label">Encaissements</div><div class="stat-value text-green-600">{{ money(summary.inflow) }}</div></div>
+  <div class="stat"><div class="stat-ico"><i data-lucide="arrow-up-right"></i></div>
+    <div class="stat-label">Décaissements</div><div class="stat-value text-red-500">{{ money(summary.outflow) }}</div></div>
+</div>
+
+{% if not accounts %}
+<div class="card card-pad empty">Aucun compte bancaire. Cliquez sur « Compte » pour en ajouter un, puis importez un relevé (CSV ou PDF).</div>
+{% else %}
+
+<!-- Sélecteur de compte -->
+<div class="flex items-center gap-2 mb-5 flex-wrap">
+  {% for a in accounts %}
+  <a href="/banque?account={{ a.id }}" class="chip {% if selected and selected.id == a.id %}is-active{% endif %}">
+    {{ a.name }} · <b>{{ money(a.current_balance) }} {{ a.currency }}</b>
+  </a>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2 class="font-semibold">{{ selected.name }}{% if selected.bank_name %} — {{ selected.bank_name }}{% endif %}</h2>
+    <span class="text-sm muted">Solde : <b>{{ money(selected.current_balance) }} {{ selected.currency }}</b></span>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="app-table" data-smart data-page-size="25">
+      <thead>
+        <tr><th>Date</th><th>Libellé</th><th class="text-right">Montant</th><th>Comptabilisation</th></tr>
+      </thead>
+      <tbody>
+      {% for t in transactions %}
+        <tr>
+          <td class="muted">{{ t.op_date.strftime('%d/%m/%Y') }}</td>
+          <td>{{ t.label }}</td>
+          <td class="text-right font-semibold {{ 'text-green-600' if t.amount > 0 else 'text-red-500' }}" data-sort="{{ t.amount }}">
+            {{ '+' if t.amount > 0 else '' }}{{ money(t.amount) }}
+          </td>
+          <td>
+            {% if t.journal_entry_id %}
+            <a href="/comptabilite/ecritures" class="badge badge-green">Comptabilisé</a>
+            {% else %}
+            <button class="btn btn-outline btn-sm" onclick="openCompta({{ t.id }}, {{ t.label|tojson }})"><i data-lucide="book-open-text" style="width:.9rem;height:.9rem"></i> Comptabiliser</button>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr data-empty><td colspan="4" class="empty">Aucun mouvement. Importez un relevé (CSV ou PDF) via « Importer un relevé ».</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<!-- Modale ajout de compte -->
+<div x-data="{ open: false }" @open-account.window="open = true" x-show="open" x-cloak class="modal-backdrop" @keydown.escape.window="open=false" style="display:none">
+  <div class="modal-panel max-w-lg" @click.outside="open = false">
+    <div class="card-header"><h3 class="font-semibold">Nouveau compte bancaire</h3>
+      <button @click="open=false" class="btn btn-ghost btn-icon"><i data-lucide="x"></i></button></div>
+    <form method="post" action="/api/bank/accounts" class="card-pad grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="sm:col-span-2"><label class="label">Nom du compte *</label><input name="name" required class="input" placeholder="Compte courant"></div>
+      <div><label class="label">Banque</label><input name="bank_name" class="input" placeholder="ex. Attijariwafa"></div>
+      <div><label class="label">Devise</label><select name="currency" class="select"><option>MAD</option><option>EUR</option><option>USD</option></select></div>
+      <div class="sm:col-span-2"><label class="label">IBAN / RIB</label><input name="iban" class="input"></div>
+      <div class="sm:col-span-2"><label class="label">Solde d'ouverture</label><input name="opening_balance" type="number" step="0.01" value="0" class="input"></div>
+      <div class="sm:col-span-2 flex justify-end gap-2">
+        <button type="button" @click="open=false" class="btn btn-outline">Annuler</button>
+        <button type="submit" class="btn btn-primary">Créer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modale comptabilisation d'un mouvement -->
+<div x-data="{ open:false, txId:null, label:'', code:'' }"
+     @open-compta.window="open=true; txId=$event.detail.id; label=$event.detail.label; code=''"
+     x-show="open" x-cloak class="modal-backdrop" @keydown.escape.window="open=false" style="display:none">
+  <div class="modal-panel max-w-lg" @click.outside="open=false">
+    <div class="card-header"><h3 class="font-semibold">Comptabiliser le mouvement</h3>
+      <button @click="open=false" class="btn btn-ghost btn-icon"><i data-lucide="x"></i></button></div>
+    <div class="card-pad space-y-4">
+      <p class="text-sm muted" x-text="label"></p>
+      <div>
+        <label class="label">Compte de contrepartie</label>
+        <select class="select" x-model="code">
+          <option value="">— choisir un compte —</option>
+          {% for a in ledger_accounts %}<option value="{{ a.code }}">{{ a.code }} — {{ a.label }}</option>{% endfor %}
+        </select>
+        <p class="text-xs muted mt-1">L'autre côté de l'écriture est le compte 5141 Banque (journal BQ).</p>
+      </div>
+      <div class="flex justify-end gap-2">
+        <button @click="open=false" class="btn btn-outline">Annuler</button>
+        <button @click="submitCompta(txId, code)" class="btn btn-primary" :disabled="!code">Comptabiliser</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function openCompta(id, label){ window.dispatchEvent(new CustomEvent('open-compta', { detail:{ id, label } })); }
+async function submitCompta(id, code){
+  if(!code) return;
+  const fd = new FormData(); fd.append('counterpart_code', code);
+  try { await _post(`/api/bank/transactions/${id}/post`, { body: fd });
+    window.toast('Mouvement comptabilisé (journal de banque).', 'success');
+    setTimeout(() => location.reload(), 700);
+  } catch (e) { window.toast('Échec : ' + e.message, 'error'); }
+}
+async function _post(url, opts) {
+  const res = await fetch(url, Object.assign({ method: 'POST', headers: { 'Accept': 'application/json' } }, opts || {}));
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || ('Erreur ' + res.status));
+  return data;
+}
+async function importStatement(input, accountId) {
+  const file = input.files[0]; if (!file) return;
+  const fd = new FormData(); fd.append('file', file);
+  window.toast('Import du relevé…', 'info');
+  try { const d = await _post(`/api/bank/accounts/${accountId}/import`, { body: fd });
+    window.toast(d.imported + ' mouvement(s) importé(s)' + (d.skipped ? ', ' + d.skipped + ' ignoré(s)' : '') + '.', 'success');
+    setTimeout(() => location.reload(), 1000);
+  } catch (e) { window.toast('Échec : ' + e.message, 'error'); } finally { input.value = ''; }
+}
+async function toggleReconcile(btn, id) {
+  try { await _post(`/api/bank/transactions/${id}/reconcile`); setTimeout(() => location.reload(), 300); }
+  catch (e) { window.toast('Échec : ' + e.message, 'error'); }
+}
+</script>
+{% endblock %}

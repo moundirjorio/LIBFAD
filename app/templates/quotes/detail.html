@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}{{ quote.number }} — LIBFAD{% endblock %}
+{% block heading %}Devis {{ quote.number }}{% endblock %}
+{% block header_extra %}
+<button class="btn btn-ghost btn-sm" onclick="duplicateQuote(this, {{ quote.id }})"><i data-lucide="copy"></i> Dupliquer</button>
+<a href="/api/quotes/{{ quote.id }}/pdf" class="btn btn-outline btn-sm">⬇ Télécharger PDF</a>
+{% if quote.status in ['draft', 'sent'] %}
+<button class="btn btn-outline btn-sm" onclick="acceptQuote(this, {{ quote.id }})">✓ Accepter</button>
+{% endif %}
+{% if not quote.converted_invoice_id %}
+<button class="btn btn-primary btn-sm" onclick="convertQuote(this, {{ quote.id }})">→ Convertir en facture</button>
+{% else %}
+<a href="/invoices/{{ quote.converted_invoice_id }}" class="btn btn-primary btn-sm">Voir la facture</a>
+{% endif %}
+{% endblock %}
+
+{% block content %}
+{% set status_label = {'accepted':'Accepté','rejected':'Refusé','sent':'Envoyé','draft':'Brouillon','expired':'Expiré','converted':'Converti'} %}
+{% set status_color = {'accepted':'green','rejected':'red','sent':'blue','draft':'slate','expired':'amber','converted':'indigo'} %}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2 card card-pad">
+    <div class="flex justify-between items-start mb-6">
+      <div>
+        <p class="text-xs muted uppercase tracking-wide">Devis</p>
+        <h2 class="text-2xl font-bold">{{ quote.number }}</h2>
+        <span class="badge badge-{{ status_color.get(quote.status, 'slate') }} mt-2">{{ status_label.get(quote.status, quote.status) }}</span>
+      </div>
+      <div class="text-right text-sm">
+        <p class="muted">Émis le</p>
+        <p class="font-medium">{{ quote.issue_date.strftime('%d/%m/%Y') }}</p>
+        <p class="muted mt-2">Valable jusqu'au</p>
+        <p class="font-medium">{{ quote.valid_until.strftime('%d/%m/%Y') }}</p>
+      </div>
+    </div>
+
+    {% if client %}
+    <div class="mb-6 text-sm rounded-xl p-4" style="background: var(--surface-2);">
+      <p class="muted uppercase text-xs tracking-wide">Client</p>
+      <p class="font-semibold">{{ client.name }}</p>
+      <p class="muted">{{ client.billing_address_line1 or '' }}</p>
+      <p class="muted">{{ client.billing_postal_code or '' }} {{ client.billing_city or '' }} — {{ client.billing_country or '' }}</p>
+    </div>
+    {% endif %}
+
+    <div class="overflow-x-auto">
+      <table class="app-table">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th class="text-right">Qté</th>
+            <th class="text-right">PU HT</th>
+            <th class="text-right">TVA</th>
+            <th class="text-right">Total HT</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for it in quote.items %}
+          <tr>
+            <td>{{ it.description }}</td>
+            <td class="text-right">{{ it.quantity }}</td>
+            <td class="text-right">{{ it.unit_price | round(2) }}</td>
+            <td class="text-right muted">{{ it.tax_rate }}%</td>
+            <td class="text-right font-medium">{{ it.line_subtotal_ht | round(2) }}</td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-5 flex justify-end">
+      <div class="w-72 text-sm space-y-1.5">
+        <div class="flex justify-between"><span class="muted">Total HT</span><span>{{ quote.subtotal_ht | round(2) }} {{ quote.currency }}</span></div>
+        <div class="flex justify-between"><span class="muted">TVA</span><span>{{ quote.total_tax | round(2) }}</span></div>
+        <div class="flex justify-between font-bold text-base pt-2 mt-1" style="border-top: 1px solid var(--border);"><span>Total TTC</span><span>{{ quote.total_ttc | round(2) }} {{ quote.currency }}</span></div>
+      </div>
+    </div>
+
+    {% if quote.notes_public %}
+    <div class="mt-6 text-sm muted pt-4" style="border-top: 1px solid var(--border);">
+      <p class="font-semibold mb-1" style="color: var(--text);">Notes</p>
+      <p>{{ quote.notes_public }}</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="space-y-4">
+    <div class="card card-pad">
+      <h3 class="font-semibold mb-3">Statut</h3>
+      <p class="text-sm muted">Ce devis est <strong>{{ status_label.get(quote.status, quote.status) | lower }}</strong>.</p>
+      {% if quote.accepted_at %}<p class="text-xs muted mt-2">Accepté le {{ quote.accepted_at.strftime('%d/%m/%Y') }}</p>{% endif %}
+      {% if quote.converted_invoice_id %}<p class="text-xs muted mt-2">Converti en facture <a href="/invoices/{{ quote.converted_invoice_id }}" class="text-brand-600 dark:text-brand-400 hover:underline">#{{ quote.converted_invoice_id }}</a></p>{% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function _quoteAction(btn, url, busy) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = busy;
+  try {
+    const res = await fetch(url, { method: 'POST', headers: { 'Accept': 'application/json' } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || ('Erreur ' + res.status));
+    return data;
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = original;
+    throw e;
+  }
+}
+
+async function acceptQuote(btn, id) {
+  try {
+    await _quoteAction(btn, `/api/quotes/${id}/accept`, '⏳…');
+    window.toast('Devis accepté.', 'success');
+    setTimeout(() => window.location.reload(), 900);
+  } catch (e) { window.toast('Échec : ' + e.message, 'error'); }
+}
+
+async function duplicateQuote(btn, id) {
+  try {
+    const data = await _quoteAction(btn, `/api/quotes/${id}/duplicate`, '⏳ Copie…');
+    window.toast('Devis dupliqué : ' + (data.number || '') + '.', 'success');
+    setTimeout(() => { window.location.href = '/quotes/' + data.quote_id; }, 800);
+  } catch (e) { window.toast('Échec : ' + e.message, 'error'); }
+}
+
+async function convertQuote(btn, id) {
+  try {
+    const data = await _quoteAction(btn, `/api/quotes/${id}/convert`, '⏳…');
+    window.toast('Devis converti en facture ' + (data.invoice_number || '') + '.', 'success');
+    setTimeout(() => { window.location.href = '/invoices/' + data.invoice_id; }, 1000);
+  } catch (e) { window.toast('Échec : ' + e.message, 'error'); }
+}
+</script>
+{% endblock %}

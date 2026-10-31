@@ -1,0 +1,25 @@
+{% extends "portal/base.html" %}
+{% block title %}Mot de passe oublié — Espace client{% endblock %}
+{% block public_content %}
+<div class="auth-card fade-in">
+  <div class="text-center mb-7">
+    <div class="brand-mark mx-auto mb-4" style="background:var(--grad-brand)"><i data-lucide="key-round"></i></div>
+    <h1 class="text-2xl font-extrabold tracking-tight">Mot de passe oublié</h1>
+    <p class="muted text-sm mt-1">On vous envoie un lien de réinitialisation.</p>
+  </div>
+  {% if sent %}
+  <div class="mb-4 p-3 rounded-xl bg-emerald-50 text-emerald-700 text-sm border border-emerald-100 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-300">
+    Si un compte existe pour cette adresse, un email avec un lien de réinitialisation vient d'être envoyé (valable 1 heure).
+  </div>
+  {% else %}
+  <form method="post" action="/portail/forgot-password" class="space-y-4">
+    <div>
+      <label class="label">Email</label>
+      <input name="email" type="email" required autofocus class="input" placeholder="vous@societe.com" />
+    </div>
+    <button type="submit" class="btn btn-primary w-full">Envoyer le lien</button>
+  </form>
+  {% endif %}
+  <p class="text-center text-sm muted mt-6"><a href="/portail/login" class="font-semibold hover:underline" style="color:var(--brand-strong)">Retour à la connexion</a></p>
+</div>
+{% endblock %}

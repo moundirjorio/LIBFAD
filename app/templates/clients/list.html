@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Clients — LIBFAD{% endblock %}
+{% block heading %}Clients{% endblock %}
+{% block header_extra %}
+<label class="btn btn-outline btn-sm cursor-pointer">
+  <i data-lucide="upload"></i> Importer CSV
+  <input type="file" accept=".csv,text/csv" class="hidden" onchange="importClientsCsv(this)" />
+</label>
+<button x-data @click="$dispatch('open-client-modal')" class="btn btn-primary btn-sm">+ Nouveau client</button>
+{% endblock %}
+
+{% block content %}
+{% from "components/ui.html" import page_header %}
+{{ page_header('Votre portefeuille clients', 'Centralisez les coordonnées, le risque et l’historique commercial.', 'users') }}
+<div class="card">
+  <div class="overflow-x-auto">
+    <table class="app-table" data-smart data-page-size="15">
+      <thead>
+        <tr>
+          <th>Nom</th><th>Email</th><th>Téléphone</th><th>Pays</th><th class="text-center">Score</th><th class="text-right" data-no-sort>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for c in clients %}
+        <tr>
+          <td>
+            <a href="/clients/{{ c.id }}" class="text-brand-600 dark:text-brand-400 hover:underline font-medium">{{ c.name }}</a>
+            {% if c.legal_name %}<p class="text-xs muted">{{ c.legal_name }}</p>{% endif %}
+          </td>
+          <td>{{ c.email or '—' }}</td>
+          <td class="muted">{{ c.phone or '—' }}</td>
+          <td class="muted">{{ c.billing_country or '—' }}</td>
+          <td class="text-center">
+            {% if c.solvency_score is not none %}
+              {% set color = 'green' if c.solvency_score >= 75 else ('amber' if c.solvency_score >= 45 else 'red') %}
+              <span class="badge badge-{{color}}">{{ c.solvency_score }}/100</span>
+            {% else %}<span class="muted text-xs">—</span>{% endif %}
+          </td>
+          <td class="text-right">
+            <a href="/clients/{{ c.id }}" class="btn btn-ghost btn-sm">Voir</a>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="empty">Aucun client. Ajoutez votre premier client.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div x-data="{ open: false }" x-cloak @open-client-modal.window="open = true" x-show="open" class="modal-backdrop" @keydown.escape.window="open = false">
+  <div class="modal-panel max-w-2xl p-6" @click.outside="open = false">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-lg font-semibold">Nouveau client</h2>
+      <button @click="open = false" class="btn btn-ghost btn-icon">&times;</button>
+    </div>
+    <form method="post" action="/api/clients/form" class="grid grid-cols-2 gap-4">
+      <div class="col-span-2"><label class="label">Nom *</label><input name="name" required class="input" /></div>
+      <div><label class="label">Email</label><input name="email" type="email" class="input" /></div>
+      <div><label class="label">Téléphone</label><input name="phone" class="input" /></div>
+      <div><label class="label">SIRET</label><input name="siret" class="input" /></div>
+      <div><label class="label">TVA</label><input name="vat_number" class="input" /></div>
+      <div><label class="label">ICE (Maroc)</label><input name="ice" class="input" /></div>
+      <div><label class="label">Pays</label>
+        <select name="billing_country" class="select">
+          <option value="FR">France</option><option value="MA">Maroc</option><option value="ES">Espagne</option><option value="DE">Allemagne</option>
+        </select></div>
+      <div class="col-span-2"><label class="label">Adresse</label><input name="billing_address_line1" class="input" /></div>
+      <div><label class="label">Code postal</label><input name="billing_postal_code" class="input" /></div>
+      <div><label class="label">Ville</label><input name="billing_city" class="input" /></div>
+      <div><label class="label">Devise</label>
+        <select name="currency" class="select"><option>EUR</option><option>MAD</option><option>USD</option></select></div>
+      <div><label class="label">Délai de paiement (jours)</label><input name="payment_terms_days" type="number" value="30" class="input" /></div>
+      <div class="col-span-2">
+        <label class="flex items-center gap-2 cursor-pointer text-sm p-3 rounded-xl" style="background:var(--surface-2); border:1px solid var(--border)">
+          <input type="checkbox" name="create_portal" value="1" class="accent-brand-600 w-4 h-4" />
+          <span><b>Créer aussi un accès à l'espace client</b> — le client recevra ses identifiants par email (nécessite un email renseigné).</span>
+        </label>
+      </div>
+      <div class="col-span-2 flex justify-end gap-2 mt-2">
+        <button type="button" @click="open = false" class="btn btn-outline">Annuler</button>
+        <button type="submit" class="btn btn-primary">Créer</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function importClientsCsv(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const fd = new FormData();
+  fd.append('file', file);
+  window.toast('Import en cours…', 'info');
+  try {
+    const res = await fetch('/api/clients/import', { method: 'POST', headers: { 'Accept': 'application/json' }, body: fd });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || ('Erreur ' + res.status));
+    let msg = data.created + ' client(s) importé(s)';
+    if (data.skipped) msg += ', ' + data.skipped + ' ignoré(s)';
+    window.toast(msg + '.', 'success');
+    if (data.errors && data.errors.length) window.toast(data.errors[0], 'error');
+    setTimeout(() => window.location.reload(), 1200);
+  } catch (e) {
+    window.toast('Échec : ' + e.message, 'error');
+  } finally { input.value = ''; }
+}
+</script>
+{% endblock %}

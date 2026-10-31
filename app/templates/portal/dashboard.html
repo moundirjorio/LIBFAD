@@ -1,0 +1,64 @@
+{% extends "portal/base.html" %}
+{% block title %}Accueil — Espace client{% endblock %}
+{% set status_label = {'paid':'Payée','overdue':'En retard','sent':'Envoyée','issued':'Émise','partially_paid':'Partiel','cancelled':'Annulée','refunded':'Remboursée'} %}
+{% set status_color = {'paid':'green','overdue':'red','sent':'blue','issued':'indigo','partially_paid':'amber','cancelled':'rose','refunded':'slate'} %}
+{% block content %}
+
+<div class="mb-6">
+  <p class="eyebrow">Bonjour {{ (portal_user.full_name or client.name) }}</p>
+  <h2 style="font-family:'Manrope',sans-serif; font-size:1.6rem; font-weight:750; letter-spacing:-.035em;">Bienvenue dans votre espace</h2>
+  <p class="muted text-sm mt-1">Retrouvez ici vos factures, devis et l'historique de vos paiements.</p>
+</div>
+
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+  <div class="stat">
+    <div class="stat-ico"><i data-lucide="wallet"></i></div>
+    <div class="stat-label">Solde à régler</div>
+    <div class="stat-value">{{ total_due | money(client.currency, client.locale) }}</div>
+    <div class="stat-hint">Total des factures non soldées</div>
+  </div>
+  <div class="stat">
+    <div class="stat-ico stat-ico-red"><i data-lucide="alarm-clock"></i></div>
+    <div class="stat-label">Dont en retard</div>
+    <div class="stat-value {% if overdue_due and overdue_due > 0 %}text-red-500{% endif %}">{{ overdue_due | money(client.currency, client.locale) }}</div>
+    <div class="stat-hint">À régler en priorité</div>
+  </div>
+  <div class="stat">
+    <div class="stat-ico"><i data-lucide="file-check-2"></i></div>
+    <div class="stat-label">Devis en attente</div>
+    <div class="stat-value">{{ pending_quotes or 0 }}</div>
+    <div class="stat-hint"><a href="/portail/devis" class="text-brand-600 dark:text-brand-400 hover:underline" style="color:var(--brand-strong)">Voir mes devis →</a></div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <h2 class="text-base font-semibold">Factures récentes</h2>
+    <a href="/portail/factures" class="btn btn-ghost btn-sm">Tout voir <i data-lucide="arrow-right"></i></a>
+  </div>
+  {% if recent_invoices %}
+  <div class="overflow-x-auto">
+    <table class="app-table">
+      <thead>
+        <tr><th>N°</th><th>Date</th><th>Échéance</th><th class="text-right">Montant</th><th>Statut</th><th></th></tr>
+      </thead>
+      <tbody>
+        {% for inv in recent_invoices %}
+        <tr class="cursor-pointer" onclick="window.location='/portail/factures/{{ inv.id }}'">
+          <td class="font-semibold">{{ inv.number }}</td>
+          <td>{{ inv.issue_date | date_fr(client.locale, 'medium') }}</td>
+          <td>{{ inv.due_date | date_fr(client.locale, 'medium') }}</td>
+          <td class="text-right font-semibold">{{ inv.total_ttc | money(inv.currency, client.locale) }}</td>
+          <td><span class="badge badge-{{ status_color.get(inv.status, 'slate') }}">{{ status_label.get(inv.status, inv.status) }}</span></td>
+          <td class="text-right"><i data-lucide="chevron-right" class="muted"></i></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty">Aucune facture pour le moment.</div>
+  {% endif %}
+</div>
+
+{% endblock %}

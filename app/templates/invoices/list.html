@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Factures — LIBFAD{% endblock %}
+{% block heading %}Factures{% endblock %}
+{% block header_extra %}
+<a href="/api/reports/export/invoices.xlsx" class="btn btn-outline btn-sm">Export Excel</a>
+<a href="/invoices/new" class="btn btn-primary btn-sm">+ Nouvelle facture</a>
+{% endblock %}
+
+{% block content %}
+{% from "components/ui.html" import page_header %}
+{{ page_header('Vos factures', 'Suivez les encaissements, les échéances et les retards en un coup d’œil.', 'receipt-text') }}
+{% set status_label = {'paid':'Payée','overdue':'En retard','sent':'Envoyée','draft':'Brouillon','issued':'Émise','partially_paid':'Partiel','cancelled':'Annulée'} %}
+{% set status_color = {'paid':'green','overdue':'red','sent':'blue','draft':'slate','issued':'indigo','partially_paid':'amber','cancelled':'rose'} %}
+
+<div class="flex flex-wrap gap-2 mb-5">
+  {% set filters = [('','Tout'), ('unpaid','À encaisser'), ('draft','Brouillon'), ('issued','Émise'), ('sent','Envoyée'), ('partially_paid','Partiel'), ('paid','Payée'), ('overdue','En retard'), ('cancelled','Annulée')] %}
+  {% for v, label in filters %}
+    <a href="/invoices{% if v %}?status={{v}}{% endif %}" class="chip {% if current_status == v %}is-active{% endif %}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+{% if current_status == 'unpaid' %}
+<div class="card card-pad mb-5 flex items-center justify-between" style="border-left:4px solid #f59e0b">
+  <div>
+    <div class="stat-label">Total restant à encaisser</div>
+    <div class="text-2xl font-extrabold mt-1 text-amber-600 dark:text-amber-400">{{ total_due | round(2) }} {{ invoices[0].currency if invoices else 'MAD' }}</div>
+  </div>
+  <div class="text-sm muted">{{ invoices | length }} facture(s) non soldée(s)</div>
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="overflow-x-auto">
+    <table class="app-table" data-smart data-page-size="15">
+      <thead>
+        <tr>
+          <th>N°</th><th>Client</th><th>Émise</th><th>Échéance</th><th>Statut</th><th class="text-right">TTC</th><th class="text-right">Dû</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for inv in invoices %}
+        <tr>
+          <td><a href="/invoices/{{ inv.id }}" class="text-brand-600 dark:text-brand-400 hover:underline font-medium">{{ inv.number }}</a></td>
+          <td>{{ clients.get(inv.client_id).name if clients.get(inv.client_id) else '—' }}</td>
+          <td class="muted">{{ inv.issue_date.strftime('%d/%m/%Y') }}</td>
+          <td class="muted">{{ inv.due_date.strftime('%d/%m/%Y') }}</td>
+          <td><span class="badge badge-{{ status_color.get(inv.status, 'slate') }}">{{ status_label.get(inv.status, inv.status) }}</span></td>
+          <td class="text-right font-medium">{{ inv.total_ttc | round(2) }} {{ inv.currency }}</td>
+          <td class="text-right {% if inv.amount_due > 0 %}text-amber-600 dark:text-amber-400 font-semibold{% else %}muted{% endif %}">{{ inv.amount_due | round(2) }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="empty">Aucune facture trouvée.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}{{ settings.app_name }}{% endblock %}</title>
+
+  <!-- Applique le thème avant le rendu (évite le flash) -->
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('theme');
+        if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <!-- CSS Tailwind PRÉ-COMPILÉ (build standalone, plus de compilation runtime) -->
+  <link rel="stylesheet" href="/static/css/tailwind.css">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/static/css/ui.css?v=libfad-atelier-4-20260727">
+
+  <!-- JS non bloquant : htmx + alpine chargés en defer -->
+  <script defer src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script defer src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+  <script defer src="/static/js/tablekit.js"></script>
+  <script defer src="/static/js/palette.js"></script>
+  <style>
+    .dossier-switch{display:flex;align-items:center;gap:.6rem;width:100%;padding:.55rem .65rem;border-radius:12px;border:1px solid var(--line);background:var(--surface-2);cursor:pointer;text-align:left;transition:.15s}
+    .dossier-switch:hover{border-color:var(--primary);background:var(--hover)}
+    .dossier-ico{display:grid;place-items:center;width:1.9rem;height:1.9rem;border-radius:8px;background:var(--primary-soft);color:var(--primary);flex:0 0 auto}
+    .dossier-ico svg{width:1rem;height:1rem}
+    .dossier-label{display:flex;flex-direction:column;min-width:0;flex:1}
+    .dossier-cap{font-size:.6rem;text-transform:uppercase;letter-spacing:.08em;color:var(--soft);font-weight:700}
+    .dossier-name{font-size:.85rem;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .dossier-menu{margin-top:.35rem;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:.35rem;max-height:320px;overflow-y:auto}
+    .dossier-item{display:flex;align-items:center;gap:.5rem;width:100%;padding:.5rem .55rem;border-radius:8px;font-size:.83rem;color:var(--ink);text-decoration:none}
+    .dossier-item:hover{background:var(--hover)}
+    .dossier-item.is-current{color:var(--primary);font-weight:700}
+    .dossier-new{display:flex;align-items:center;gap:.4rem;width:100%;padding:.5rem .55rem;margin-top:.25rem;border-top:1px solid var(--line);border-radius:0 0 8px 8px;color:var(--primary);font-weight:650;font-size:.82rem;background:none;cursor:pointer}
+    .dossier-new:hover{background:var(--hover)}
+  </style>
+</head>
+<body class="h-full">
+  <div id="toast-root"></div>
+
+  <!-- Bandeau cookies (cookies strictement nécessaires) -->
+  <div id="cookie-banner" style="display:none; position:fixed; left:1rem; right:1rem; bottom:1rem; z-index:90; max-width:640px; margin:0 auto;"
+       class="card card-pad">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+      <p class="text-sm muted flex-1">Nous utilisons uniquement des cookies strictement nécessaires au fonctionnement du service (session, sécurité). <a href="/legal/confidentialite" class="font-semibold" style="color:var(--brand-strong)">En savoir plus</a>.</p>
+      <button onclick="acceptCookies()" class="btn btn-primary btn-sm shrink-0">J'ai compris</button>
+    </div>
+  </div>
+  <script>
+    (function(){ try { if(!localStorage.getItem('cookie-consent')){ var b=document.getElementById('cookie-banner'); if(b) b.style.display='block'; } } catch(e){} })();
+    function acceptCookies(){ try{ localStorage.setItem('cookie-consent','1'); }catch(e){} var b=document.getElementById('cookie-banner'); if(b) b.style.display='none'; }
+  </script>
+
+  {% if current_user %}
+  <div class="min-h-full flex" x-data="{ mobileOpen: false }">
+    <!-- Overlay mobile -->
+    <div x-show="mobileOpen" x-cloak @click="mobileOpen=false" class="fixed inset-0 bg-black/40 z-30 lg:hidden"></div>
+
+    <!-- Sidebar -->
+    <aside class="app-sidebar w-60 flex flex-col fixed inset-y-0 left-0 z-40 transform transition-transform duration-200 lg:translate-x-0 lg:static"
+           :class="mobileOpen ? 'translate-x-0' : '-translate-x-full'">
+      <div class="px-5 py-5 sidebar-brand">
+        <a href="/" class="flex items-center gap-3">
+          <span class="brand-mark brand-mark-sm"><i data-lucide="sparkles"></i></span>
+          <span>
+            <span class="block brand-name">LIBFAD</span>
+            <span class="block brand-caption">Gestion simplifiée</span>
+          </span>
+        </a>
+      </div>
+      <!-- Sélecteur de dossier (multi-sociétés) -->
+      <div class="px-3 pt-1 pb-2" x-data="{ open:false }" @keydown.escape.window="open=false">
+        <button @click="open=!open" class="dossier-switch" title="Changer de dossier">
+          <span class="dossier-ico"><i data-lucide="building-2"></i></span>
+          <span class="dossier-label"><span class="dossier-cap">Dossier</span><span class="dossier-name" data-dossier-current>…</span></span>
+          <i data-lucide="chevrons-up-down" style="width:.9rem;height:.9rem;opacity:.6"></i>
+        </button>
+        <div x-show="open" x-cloak @click.outside="open=false" class="dossier-menu">
+          <div data-dossier-list></div>
+          <button type="button" @click="open=false; $dispatch('open-newdossier')" class="dossier-new"><i data-lucide="plus" style="width:.9rem;height:.9rem"></i> Nouveau dossier</button>
+        </div>
+      </div>
+
+      <nav class="flex-1 p-3 space-y-1 overflow-y-auto">
+        {% set nav = [
+          ('/', 'Tableau de bord', 'layout-dashboard'),
+          ('/clients', 'Clients', 'users'),
+          ('/products', 'Produits', 'package'),
+          ('/invoices', 'Factures', 'receipt-text'),
+          ('/quotes', 'Devis', 'file-check-2'),
+          ('/subscriptions', 'Abonnements', 'repeat-2'),
+          ('/banque', 'Trésorerie', 'landmark'),
+          ('/achats', 'Factures d\'achat', 'receipt'),
+          ('/fournisseurs', 'Fournisseurs', 'truck'),
+          ('/comptabilite/ecritures', 'Écritures', 'book-open-text'),
+          ('/comptabilite/balance', 'Balance', 'scale'),
+          ('/comptabilite/grand-livre', 'Grand livre', 'book-marked'),
+          ('/comptabilite/etats', 'États de synthèse', 'file-spreadsheet'),
+          ('/comptabilite/tva', 'Déclaration TVA', 'percent'),
+          ('/comptabilite/plan', 'Plan comptable', 'list-tree'),
+          ('/documents', 'Documents OCR', 'scan-text'),
+          ('/dunning', 'Relances', 'send'),
+          ('/reports', 'Rapports', 'chart-no-axes-combined'),
+          ('/chat', 'Assistant IA', 'message-circle-more'),
+          ('/telegram', 'Bot Telegram', 'bot'),
+          ('/billing', 'Abonnement', 'credit-card'),
+          ('/cabinet/collaborateurs', 'Collaborateurs', 'users-round'),
+          ('/settings', 'Paramètres', 'settings-2')
+        ] %}
+        {% for href, label, icon in nav %}
+          {% if loop.index == 1 %}<p class="nav-section">Pilotage</p>{% endif %}
+          {% if loop.index == 2 %}<p class="nav-section">Ventes</p>{% endif %}
+          {% if loop.index == 7 %}<p class="nav-section">Comptabilité</p>{% endif %}
+          {% if loop.index == 16 %}<p class="nav-section">Automatisation</p>{% endif %}
+          {% if loop.index == 21 %}<p class="nav-section">Compte</p>{% endif %}
+          <a href="{{ href }}" class="nav-link {% if request.url.path == href or (href != '/' and request.url.path.startswith(href)) %}is-active{% endif %}">
+            <span class="nav-ico"><i data-lucide="{{ icon }}"></i></span>{{ label }}
+          </a>
+        {% endfor %}
+      </nav>
+      <div class="p-3 border-t border-white/10">
+        <div class="flex items-center gap-3 px-2 py-2 rounded-xl bg-white/5">
+          <div class="w-9 h-9 rounded-full bg-gradient-to-br from-brand-400 to-brand-600 grid place-items-center text-white font-semibold text-sm shrink-0">
+            {{ (current_user.full_name or current_user.email)[:1] | upper }}
+          </div>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-semibold text-slate-100 truncate">{{ current_user.full_name }}</p>
+            <p class="text-xs text-slate-400 truncate">{{ current_user.email }}</p>
+          </div>
+          <a href="/logout" title="Déconnexion" class="sidebar-signout"><i data-lucide="log-out"></i></a>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Contenu -->
+    <main class="flex-1 min-w-0 flex flex-col h-screen overflow-hidden">
+      <header class="app-topbar sticky top-0 z-20 px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-3 min-w-0">
+          <button @click="mobileOpen=true" class="btn btn-ghost btn-icon lg:hidden" aria-label="Menu"><i data-lucide="menu"></i></button>
+          <div class="topbar-context">
+            <span class="topbar-kicker">Espace de gestion</span>
+            <h1 class="text-lg font-semibold truncate">{% block heading %}{% endblock %}</h1>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button onclick="window.openCommandPalette && window.openCommandPalette()" title="Recherche (Ctrl+K)" aria-label="Recherche"
+                  class="btn btn-outline btn-sm hidden sm:inline-flex items-center gap-2 muted">
+            <i data-lucide="search" style="width:1rem;height:1rem"></i>
+            <span class="text-xs">Rechercher</span>
+            <kbd class="text-[10px] border rounded px-1" style="border-color:var(--border)">Ctrl K</kbd>
+          </button>
+          {% block header_extra %}{% endblock %}
+          <button class="btn btn-ghost btn-icon notification-button hidden sm:inline-flex" title="Notifications" aria-label="Notifications">
+            <i data-lucide="bell"></i><span class="notification-dot"></span>
+          </button>
+          <button x-data
+                  @click="document.documentElement.classList.toggle('dark'); localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light')"
+                  class="btn btn-ghost btn-icon" title="Changer de thème" aria-label="Changer de thème">
+            <i data-lucide="sun-moon"></i>
+          </button>
+        </div>
+      </header>
+      <div class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <div class="fade-in content-shell">
+          {% block content %}{% endblock %}
+        </div>
+      </div>
+    </main>
+    <nav class="mobile-dock lg:hidden" aria-label="Navigation mobile">
+      <a href="/" class="{% if request.url.path == '/' %}is-active{% endif %}"><i data-lucide="layout-dashboard"></i><span>Accueil</span></a>
+      <a href="/invoices" class="{% if request.url.path.startswith('/invoices') %}is-active{% endif %}"><i data-lucide="receipt-text"></i><span>Factures</span></a>
+      <a href="/invoices/new" class="mobile-dock-create" aria-label="Nouvelle facture"><i data-lucide="plus"></i></a>
+      <a href="/clients" class="{% if request.url.path.startswith('/clients') %}is-active{% endif %}"><i data-lucide="users"></i><span>Clients</span></a>
+      <button type="button" @click="mobileOpen=true"><i data-lucide="menu"></i><span>Menu</span></button>
+    </nav>
+  </div>
+  {% else %}
+  <div class="auth-wrap">
+    <button onclick="toggleTheme()" title="Changer de thème" aria-label="Changer de thème"
+            class="btn btn-ghost btn-icon" style="position:fixed;top:1rem;right:1rem;z-index:50">
+      <i data-lucide="sun-moon"></i>
+    </button>
+    {% block public_content %}{% endblock %}
+  </div>
+  {% endif %}
+
+  <!-- Helper toasts -->
+  <script>
+    window.toggleTheme = function () {
+      var dark = document.documentElement.classList.toggle('dark');
+      try { localStorage.setItem('theme', dark ? 'dark' : 'light'); } catch (e) {}
+      if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } });
+    };
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } });
+    });
+    window.toast = function (msg, type) {
+      var root = document.getElementById('toast-root');
+      if (!root) return;
+      var el = document.createElement('div');
+      el.className = 'toast';
+      el.style.borderLeftColor = type === 'error' ? '#ef4444' : (type === 'success' ? '#10b981' : 'var(--brand)');
+      el.innerHTML = '<span>' + (type === 'error' ? '⚠️' : (type === 'success' ? '✅' : 'ℹ️')) + '</span><span>' + msg + '</span>';
+      root.appendChild(el);
+      setTimeout(function () { el.style.transition = 'opacity .3s, transform .3s'; el.style.opacity = '0'; el.style.transform = 'translateX(20px)'; setTimeout(function(){ el.remove(); }, 300); }, 3200);
+    };
+  </script>
+  {% if current_user %}
+  <!-- Modale nouveau dossier -->
+  <div x-data="{ open:false }" @open-newdossier.window="open=true" x-show="open" x-cloak class="modal-backdrop" @keydown.escape.window="open=false" style="display:none">
+    <div class="modal-panel max-w-lg" @click.outside="open=false">
+      <div class="card-header"><h3 class="font-semibold">Nouveau dossier</h3>
+        <button @click="open=false" class="btn btn-ghost btn-icon"><i data-lucide="x"></i></button></div>
+      <form method="post" action="/dossiers/create" class="card-pad grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div class="sm:col-span-2"><label class="label">Nom de la société *</label><input name="company_name" required class="input" placeholder="ex. SORENCO SARL"></div>
+        <div><label class="label">Pays</label><select name="country" class="select"><option value="MA">Maroc</option><option value="FR">France</option></select></div>
+        <div><label class="label">Devise</label><select name="currency" class="select"><option>MAD</option><option>EUR</option><option>USD</option></select></div>
+        <div class="sm:col-span-2 flex justify-end gap-2">
+          <button type="button" @click="open=false" class="btn btn-outline">Annuler</button>
+          <button type="submit" class="btn btn-primary">Créer le dossier</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script>
+    (function(){
+      fetch('/api/dossiers', { headers:{ 'Accept':'application/json' } })
+        .then(function(r){ return r.ok ? r.json() : null; })
+        .then(function(d){
+          if(!d) return;
+          var cur = document.querySelector('[data-dossier-current]');
+          if(cur) cur.textContent = d.current.name;
+          var list = document.querySelector('[data-dossier-list]');
+          if(list){
+            list.innerHTML = d.dossiers.map(function(t){
+              var active = t.id === d.current.id;
+              return '<a href="/dossiers/switch/'+t.id+'" class="dossier-item'+(active?' is-current':'')+'">'+
+                '<i data-lucide="'+(active?'check':'building')+'" style="width:.9rem;height:.9rem"></i>'+
+                '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+
+                (t.name.replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}))+'</span></a>';
+            }).join('');
+            if(window.lucide) window.lucide.createIcons();
+          }
+        }).catch(function(){});
+    })();
+  </script>
+  {% endif %}
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Relances — LIBFAD{% endblock %}
+{% block heading %}Relances automatiques{% endblock %}
+{% block header_extra %}
+<button class="btn btn-primary btn-sm" onclick="runDailyJob(this)">⏰ Lancer le job quotidien</button>
+{% endblock %}
+
+{% block content %}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+  <div class="card">
+    <div class="card-header"><h2>Scénarios de relance</h2></div>
+    <div class="p-5 space-y-3">
+      {% for s in scenarios %}
+        <div class="rounded-xl p-4" style="border: 1px solid var(--border); background: var(--surface-2);">
+          <div class="flex items-center justify-between">
+            <p class="font-medium">{{ s.name }} {% if s.is_default %}<span class="badge badge-indigo ml-1">par défaut</span>{% endif %}</p>
+            <span class="text-xs muted">{{ s.steps | length }} étapes</span>
+          </div>
+          <ul class="mt-2 text-sm muted space-y-1">
+            {% for step in s.steps | sort(attribute='order_index') %}
+              <li class="flex items-center gap-2"><span class="badge badge-slate">J+{{ step.offset_days }}</span> {{ step.channel }} · ton {{ step.tone }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% else %}
+        <p class="empty">Aucun scénario configuré.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header"><h2>Relances en cours</h2></div>
+    <ul class="divide-y divide-slate-100">
+      {% for run in runs %}
+        <li class="px-5 py-3 text-sm">
+          <p class="font-medium">Facture #{{ run.invoice_id }} — étape {{ run.current_step_index + 1 }}</p>
+          <p class="text-xs muted mt-0.5">Prochaine action : {{ run.next_action_at | datetime_fr if run.next_action_at else '—' }}</p>
+        </li>
+      {% else %}
+        <li class="empty">Aucune relance active.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+<div class="card mt-6">
+  <div class="card-header"><h2>Historique des messages</h2></div>
+  <div class="overflow-x-auto">
+    <table class="app-table">
+      <thead>
+        <tr><th>Date</th><th>Destinataire</th><th>Objet</th><th>Ton</th><th>Statut</th></tr>
+      </thead>
+      <tbody>
+      {% set msg_color = {'sent':'green','failed':'red','queued':'amber','replied':'blue','opened':'indigo'} %}
+      {% for m in messages %}
+        <tr>
+          <td class="muted whitespace-nowrap">{{ (m.sent_at or m.created_at) | datetime_fr }}</td>
+          <td>{{ m.to_email or '—' }}</td>
+          <td class="max-w-xs truncate" title="{{ m.subject or '' }}">{{ m.subject or '—' }}</td>
+          <td class="muted">{{ m.tone or '—' }}</td>
+          <td>
+            <span class="badge badge-{{ msg_color.get(m.status, 'slate') }}">{{ m.status }}</span>
+            {% if m.status == 'failed' and m.error %}<span class="text-xs text-red-500 ml-1" title="{{ m.error }}">ⓘ</span>{% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="empty">Aucun message de relance envoyé pour l'instant.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+async function runDailyJob(btn) {
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.textContent = '⏳ Traitement…';
+  try {
+    const res = await fetch('/api/dunning/daily', { method: 'POST', headers: { 'Accept': 'application/json' } });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const s = await res.json();
+    window.toast(
+      `Job terminé : ${s.dunning_runs_started} relance(s) démarrée(s), ${s.dunning_messages_sent} email(s) envoyé(s), ${s.marked_overdue} facture(s) en retard.`,
+      'success'
+    );
+    setTimeout(() => window.location.reload(), 1200);
+  } catch (e) {
+    window.toast('Échec du job de relance : ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = original;
+  }
+}
+</script>
+{% endblock %}

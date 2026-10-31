@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Devis — LIBFAD{% endblock %}
+{% block heading %}Devis{% endblock %}
+{% block header_extra %}
+<a href="/quotes/new" class="btn btn-primary btn-sm">+ Devis</a>
+{% endblock %}
+{% block content %}
+{% from "components/ui.html" import page_header %}
+{{ page_header('Vos devis', 'Préparez vos offres, suivez leur validation et transformez-les en factures.', 'file-check-2') }}
+{% set status_color = {'accepted':'green','rejected':'red','sent':'blue','draft':'slate','expired':'amber','converted':'indigo'} %}
+<div class="card">
+  <div class="overflow-x-auto">
+    <table class="app-table" data-smart data-page-size="15">
+      <thead>
+        <tr><th>N°</th><th>Client</th><th>Date</th><th>Valide jusqu'au</th><th>Statut</th><th class="text-right">TTC</th><th class="text-right" data-no-sort>Actions</th></tr>
+      </thead>
+      <tbody>
+      {% for q in quotes %}
+        <tr>
+          <td class="font-medium"><a href="/quotes/{{ q.id }}" class="text-brand-600 dark:text-brand-400 hover:underline">{{ q.number }}</a></td>
+          <td>{{ clients.get(q.client_id).name if clients.get(q.client_id) else '—' }}</td>
+          <td class="muted">{{ q.issue_date.strftime('%d/%m/%Y') }}</td>
+          <td class="muted">{{ q.valid_until.strftime('%d/%m/%Y') }}</td>
+          <td><span class="badge badge-{{ status_color.get(q.status, 'slate') }}">{{ q.status }}</span></td>
+          <td class="text-right font-semibold">{{ q.total_ttc | round(2) }} {{ q.currency }}</td>
+          <td class="text-right whitespace-nowrap">
+            <a href="/api/quotes/{{ q.id }}/pdf" class="btn btn-ghost btn-sm">PDF</a>
+            <button class="btn btn-ghost btn-sm text-indigo-600 dark:text-indigo-400" onclick="sendQuote(this, {{ q.id }})">📧 Envoyer</button>
+            {% if q.status in ['draft', 'sent'] %}
+            <button class="btn btn-ghost btn-sm text-blue-600 dark:text-blue-400" onclick="acceptQuote(this, {{ q.id }})">✓ Accepter</button>
+            {% endif %}
+            {% if not q.converted_invoice_id %}
+            <button class="btn btn-ghost btn-sm text-green-600 dark:text-green-400" onclick="convertQuote(this, {{ q.id }})">→ Facture</button>
+            {% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="empty">Aucun devis.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+async function _quoteAction(btn, url, busy) {
+  const original = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = busy;
+  try {
+    const res = await fetch(url, { method: 'POST', headers: { 'Accept': 'application/json' } });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || ('Erreur ' + res.status));
+    return data;
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = original;
+    throw e;
+  }
+}
+
+async function acceptQuote(btn, id) {
+  try {
+    await _quoteAction(btn, `/api/quotes/${id}/accept`, '⏳…');
+    window.toast('Devis accepté.', 'success');
+    setTimeout(() => window.location.reload(), 900);
+  } catch (e) { window.toast('Échec : ' + e.message, 'error'); }
+}
+
+async function sendQuote(btn, id) {
+  try {
+    const data = await _quoteAction(btn, `/api/quotes/${id}/send`, '⏳ Envoi…');
+    window.toast('Devis envoyé à ' + (data.sent_to || 'client') + '.', 'success');
+    setTimeout(() => window.location.reload(), 900);
+  } catch (e) { window.toast('Échec : ' + e.message, 'error'); }
+}
+
+async function convertQuote(btn, id) {
+  try {
+    const data = await _quoteAction(btn, `/api/quotes/${id}/convert`, '⏳…');
+    window.toast('Devis converti en facture ' + (data.invoice_number || '') + '.', 'success');
+    setTimeout(() => { window.location.href = '/invoices/' + data.invoice_id; }, 1000);
+  } catch (e) { window.toast('Échec : ' + e.message, 'error'); }
+}
+</script>
+{% endblock %}

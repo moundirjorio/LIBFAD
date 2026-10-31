@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Espace client — {{ settings.app_name }}{% endblock %}</title>
+
+  <script>
+    (function () {
+      try {
+        var t = localStorage.getItem('theme');
+        if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.classList.add('dark');
+        }
+      } catch (e) {}
+    })();
+  </script>
+
+  <link rel="stylesheet" href="/static/css/tailwind.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/css/ui.css?v=libfad-studio-2-20260727">
+
+  <script defer src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <script defer src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+</head>
+<body class="h-full">
+  <div id="toast-root"></div>
+
+  <!-- Bandeau cookies -->
+  <div id="cookie-banner" style="display:none; position:fixed; left:1rem; right:1rem; bottom:1rem; z-index:90; max-width:640px; margin:0 auto;" class="card card-pad">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+      <p class="text-sm muted flex-1">Cookies strictement nécessaires au fonctionnement de votre espace. <a href="/legal/confidentialite" class="font-semibold" style="color:var(--brand-strong)">En savoir plus</a>.</p>
+      <button onclick="acceptCookies()" class="btn btn-primary btn-sm shrink-0">J'ai compris</button>
+    </div>
+  </div>
+  <script>
+    (function(){ try { if(!localStorage.getItem('cookie-consent')){ var b=document.getElementById('cookie-banner'); if(b) b.style.display='block'; } } catch(e){} })();
+    function acceptCookies(){ try{ localStorage.setItem('cookie-consent','1'); }catch(e){} var b=document.getElementById('cookie-banner'); if(b) b.style.display='none'; }
+  </script>
+
+  {% if portal_user %}
+  <div class="min-h-full flex flex-col">
+    <header class="portal-topbar px-4 sm:px-6 py-3">
+      <div class="portal-container flex items-center justify-between gap-3" x-data="{ open: false }">
+        <a href="/portail" class="flex items-center gap-3 shrink-0">
+          <span class="portal-brand-mark"><i data-lucide="user-round"></i></span>
+          <span class="leading-tight">
+            <span class="block font-extrabold" style="font-family:'Manrope',sans-serif; letter-spacing:-.02em;">Espace client</span>
+            <span class="block text-xs muted">{{ client.name if client else settings.app_name }}</span>
+          </span>
+        </a>
+
+        {% set pnav = [
+          ('/portail', 'Accueil', 'layout-dashboard'),
+          ('/portail/factures', 'Factures', 'receipt-text'),
+          ('/portail/devis', 'Devis', 'file-check-2'),
+          ('/portail/paiements', 'Paiements', 'wallet'),
+          ('/portail/profil', 'Profil', 'user-round-cog')
+        ] %}
+        <nav class="hidden md:flex items-center gap-1">
+          {% for href, label, icon in pnav %}
+            <a href="{{ href }}" class="portal-nav-link {% if request.url.path == href or (href != '/portail' and request.url.path.startswith(href)) %}is-active{% endif %}">
+              <i data-lucide="{{ icon }}"></i>{{ label }}
+            </a>
+          {% endfor %}
+        </nav>
+
+        <div class="flex items-center gap-2">
+          <button x-data
+                  @click="document.documentElement.classList.toggle('dark'); localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light')"
+                  class="btn btn-ghost btn-icon" title="Changer de thème" aria-label="Changer de thème">
+            <i data-lucide="sun-moon"></i>
+          </button>
+          <a href="/portail/logout" class="btn btn-outline btn-sm"><i data-lucide="log-out"></i><span class="hidden sm:inline">Déconnexion</span></a>
+          <button @click="open=!open" class="btn btn-ghost btn-icon md:hidden" aria-label="Menu"><i data-lucide="menu"></i></button>
+        </div>
+      </div>
+
+      <!-- Nav mobile -->
+      <div class="portal-container md:hidden mt-2 flex flex-wrap gap-1">
+        {% for href, label, icon in pnav %}
+          <a href="{{ href }}" class="portal-nav-link {% if request.url.path == href or (href != '/portail' and request.url.path.startswith(href)) %}is-active{% endif %}">
+            <i data-lucide="{{ icon }}"></i>{{ label }}
+          </a>
+        {% endfor %}
+      </div>
+    </header>
+
+    <main class="flex-1 px-4 sm:px-6 py-6">
+      <div class="portal-container fade-in">
+        {% block content %}{% endblock %}
+      </div>
+    </main>
+
+    <footer class="px-4 sm:px-6 py-5 text-center text-xs muted border-t" style="border-color:var(--line)">
+      <div>Espace client sécurisé — propulsé par {{ settings.app_name }}</div>
+      <div class="mt-2 flex flex-wrap justify-center" style="gap:.35rem .9rem">
+        <a href="/legal/mentions" class="hover:underline">Mentions légales</a>
+        <a href="/legal/cgu" class="hover:underline">CGU</a>
+        <a href="/legal/confidentialite" class="hover:underline">Confidentialité</a>
+      </div>
+    </footer>
+  </div>
+  {% else %}
+  <div class="auth-wrap">
+    {% block public_content %}{% endblock %}
+  </div>
+  {% endif %}
+
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      if (window.lucide) window.lucide.createIcons({ attrs: { 'stroke-width': 1.8 } });
+    });
+    window.toast = function (msg, type) {
+      var root = document.getElementById('toast-root');
+      if (!root) return;
+      var el = document.createElement('div');
+      el.className = 'toast';
+      el.style.borderLeftColor = type === 'error' ? '#ef4444' : (type === 'success' ? '#10b981' : 'var(--brand)');
+      el.innerHTML = '<span>' + (type === 'error' ? '⚠️' : (type === 'success' ? '✅' : 'ℹ️')) + '</span><span>' + msg + '</span>';
+      root.appendChild(el);
+      setTimeout(function () { el.style.transition = 'opacity .3s, transform .3s'; el.style.opacity = '0'; el.style.transform = 'translateX(20px)'; setTimeout(function(){ el.remove(); }, 300); }, 3200);
+    };
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

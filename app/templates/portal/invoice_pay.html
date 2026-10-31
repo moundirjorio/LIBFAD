@@ -1,0 +1,77 @@
+{% extends "portal/base.html" %}
+{% block title %}Régler la facture {{ invoice.number }} — Espace client{% endblock %}
+{% block content %}
+
+<div class="mb-6">
+  <a href="/portail/factures/{{ invoice.id }}" class="text-sm muted hover:underline inline-flex items-center gap-1"><i data-lucide="arrow-left"></i> Retour à la facture</a>
+  <h2 class="mt-1" style="font-family:'Manrope',sans-serif; font-size:1.5rem; font-weight:750; letter-spacing:-.03em;">Régler la facture {{ invoice.number }}</h2>
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+  <div class="lg:col-span-2 card card-pad">
+    <h3 class="font-semibold mb-1">Paiement par virement bancaire</h3>
+    <p class="text-sm muted mb-5">Effectuez un virement vers le compte ci-dessous en indiquant la référence de la facture.</p>
+
+    {% if tenant and (tenant.iban or tenant.bank_name) %}
+    <dl class="text-sm divide-y" style="border-color:var(--border)">
+      {% if tenant.bank_name %}
+      <div class="flex justify-between py-2.5"><dt class="muted">Banque</dt><dd class="font-medium text-right">{{ tenant.bank_name }}</dd></div>
+      {% endif %}
+      <div class="flex justify-between py-2.5"><dt class="muted">Bénéficiaire</dt><dd class="font-medium text-right">{{ tenant.legal_name or tenant.name }}</dd></div>
+      {% if tenant.iban %}
+      <div class="flex justify-between py-2.5 gap-4">
+        <dt class="muted">IBAN / RIB</dt>
+        <dd class="font-mono font-semibold text-right break-all">
+          {{ tenant.iban }}
+          <button type="button" class="btn btn-ghost btn-sm ml-1 align-middle" onclick="copyText('{{ tenant.iban }}', this)"><i data-lucide="copy"></i></button>
+        </dd>
+      </div>
+      {% endif %}
+      {% if tenant.bic %}
+      <div class="flex justify-between py-2.5"><dt class="muted">BIC / SWIFT</dt><dd class="font-mono font-semibold text-right">{{ tenant.bic }}</dd></div>
+      {% endif %}
+      <div class="flex justify-between py-2.5">
+        <dt class="muted">Référence à indiquer</dt>
+        <dd class="font-semibold text-right">
+          {{ invoice.number }}
+          <button type="button" class="btn btn-ghost btn-sm ml-1 align-middle" onclick="copyText('{{ invoice.number }}', this)"><i data-lucide="copy"></i></button>
+        </dd>
+      </div>
+    </dl>
+    <div class="mt-5 p-3 rounded-xl text-sm border flex items-start gap-2" style="border-color:var(--border); background:var(--brand-soft); color:var(--brand-strong)">
+      <i data-lucide="info" class="mt-0.5 shrink-0"></i>
+      <span>Une fois le virement effectué, votre paiement sera pris en compte dès réception. Vous pouvez joindre votre fournisseur pour toute question.</span>
+    </div>
+    {% else %}
+    <div class="p-4 rounded-xl border text-sm" style="border-color:var(--border); background:var(--surface-2)">
+      Les coordonnées bancaires ne sont pas encore renseignées. Merci de contacter votre fournisseur
+      {% if tenant and tenant.email %}à l'adresse <a href="mailto:{{ tenant.email }}" class="font-semibold" style="color:var(--brand-strong)">{{ tenant.email }}</a>{% endif %}
+      pour obtenir les modalités de paiement.
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card card-pad h-fit">
+    <div class="stat-label">Montant à régler</div>
+    <div class="text-3xl font-extrabold mt-2 {% if invoice.amount_due and invoice.amount_due > 0 %}text-amber-600{% else %}text-green-600{% endif %}">
+      {{ invoice.amount_due | money(invoice.currency, client.locale) }}
+    </div>
+    <div class="text-sm muted mt-3 space-y-1">
+      <div class="flex justify-between"><span>Total TTC</span><span>{{ invoice.total_ttc | money(invoice.currency, client.locale) }}</span></div>
+      <div class="flex justify-between"><span>Déjà payé</span><span>{{ invoice.amount_paid | money(invoice.currency, client.locale) }}</span></div>
+    </div>
+    <div class="text-xs muted mt-4">Échéance : {{ invoice.due_date | date_fr(client.locale) }}</div>
+    <a href="/portail/factures/{{ invoice.id }}/pdf" class="btn btn-outline btn-sm w-full mt-4"><i data-lucide="download"></i> Télécharger la facture</a>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+function copyText(txt, btn) {
+  navigator.clipboard.writeText(txt).then(function () {
+    window.toast('Copié : ' + txt, 'success');
+  }).catch(function () { window.toast('Copie impossible', 'error'); });
+}
+</script>
+{% endblock %}

@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: libfad
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-libfad}
+      POSTGRES_DB: libfad
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U libfad -d libfad"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Surchargent .env pour pointer vers le service 'db' du réseau Compose.
+      DATABASE_URL: postgresql+asyncpg://libfad:${DB_PASSWORD:-libfad}@db:5432/libfad
+      DATABASE_URL_SYNC: postgresql+psycopg2://libfad:${DB_PASSWORD:-libfad}@db:5432/libfad
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - storage:/app/storage
+
+volumes:
+  db_data:
+  storage:

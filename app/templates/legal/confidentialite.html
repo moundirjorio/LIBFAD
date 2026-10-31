@@ -1,0 +1,51 @@
+{% extends "legal/base.html" %}
+{% block body %}
+<p>La présente politique décrit comment {{ company.name }} (« l'Éditeur ») traite les données
+personnelles dans le cadre du service {{ company.product }}, conformément à la loi marocaine
+n° 09-08 relative à la protection des personnes physiques à l'égard du traitement des données
+à caractère personnel (et, le cas échéant, au RGPD pour les utilisateurs de l'Union européenne).</p>
+
+<h2>1. Responsable du traitement</h2>
+<p>{{ company.name }} — {{ company.address }} — <a href="mailto:{{ company.dpo_email }}">{{ company.dpo_email }}</a>.</p>
+
+<h2>2. Données collectées</h2>
+<ul>
+  <li>Données de compte : nom, email, mot de passe (haché), société.</li>
+  <li>Données métier saisies par l'utilisateur : clients, factures, devis, documents.</li>
+  <li>Données techniques : logs de connexion, adresse IP, journal d'activité.</li>
+</ul>
+
+<h2>3. Finalités</h2>
+<ul>
+  <li>Fournir et exploiter le service (facturation, gestion, espace client).</li>
+  <li>Assurer la sécurité, prévenir la fraude et les abus.</li>
+  <li>Gérer la facturation des abonnements et le support.</li>
+</ul>
+
+<h2>4. Base légale</h2>
+<p>Les traitements reposent sur l'exécution du contrat (fourniture du service), le respect
+d'obligations légales (comptables, fiscales) et l'intérêt légitime de l'Éditeur (sécurité).</p>
+
+<h2>5. Durée de conservation</h2>
+<p>Les données sont conservées pendant la durée d'utilisation du service, puis pendant les
+durées légales de conservation (notamment comptables et fiscales) avant suppression ou
+anonymisation.</p>
+
+<h2>6. Destinataires et sous-traitants</h2>
+<p>Les données peuvent être traitées par des sous-traitants techniques (hébergement, envoi
+d'emails, paiement) agissant pour le compte de l'Éditeur et tenus à la confidentialité.</p>
+
+<h2>7. Sécurité</h2>
+<p>L'Éditeur met en œuvre des mesures techniques et organisationnelles : mots de passe hachés,
+chiffrement des échanges (HTTPS), contrôle d'accès, journalisation, sauvegardes.</p>
+
+<h2>8. Vos droits</h2>
+<p>Vous disposez d'un droit d'accès, de rectification, d'opposition, de suppression et de
+portabilité de vos données. Pour les exercer : <a href="mailto:{{ company.dpo_email }}">{{ company.dpo_email }}</a>.
+Vous pouvez également saisir la CNDP (Commission Nationale de contrôle de la protection des
+Données à caractère Personnel).</p>
+
+<h2>9. Cookies</h2>
+<p>Le service utilise des cookies strictement nécessaires à son fonctionnement (session,
+sécurité). Aucun cookie publicitaire n'est déposé sans consentement.</p>
+{% endblock %}

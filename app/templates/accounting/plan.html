@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Plan comptable — LIBFAD{% endblock %}
+{% block heading %}Plan comptable{% endblock %}
+{% block content %}
+{% set classes = {1:'Financement permanent',2:'Actif immobilisé',3:'Actif circulant',4:'Passif circulant',5:'Trésorerie',6:'Charges',7:'Produits',8:'Résultats'} %}
+{% set nature_color = {'actif':'blue','passif':'indigo','charge':'rose','produit':'green','tresorerie':'amber'} %}
+<p class="text-sm muted mb-5">Plan comptable CGNC (Maroc). Comptes utilisés pour vos écritures.</p>
+<div class="card">
+  <div class="overflow-x-auto">
+    <table class="app-table" data-smart data-page-size="30">
+      <thead>
+        <tr><th>Code</th><th>Intitulé</th><th>Classe</th><th>Nature</th></tr>
+      </thead>
+      <tbody>
+      {% for a in accounts %}
+        <tr>
+          <td class="font-semibold">{{ a.code }}</td>
+          <td>{{ a.label }}</td>
+          <td class="muted">{{ a.account_class }} · {{ classes.get(a.account_class, '') }}</td>
+          <td><span class="badge badge-{{ nature_color.get(a.nature, 'slate') }}">{{ a.nature or '—' }}</span></td>
+        </tr>
+      {% else %}
+        <tr data-empty><td colspan="4" class="empty">Plan comptable vide.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

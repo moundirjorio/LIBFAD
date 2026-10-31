@@ -1,0 +1,160 @@
+{% extends "base.html" %}
+{% block title %}Factures d'achat — LIBFAD{% endblock %}
+{% block heading %}Factures d'achat{% endblock %}
+{% macro money(v) %}{{ '{:,.2f}'.format(v|float).replace(',', ' ').replace('.', ',') }}{% endmacro %}
+{% block header_extra %}
+<button class="btn btn-outline btn-sm" x-data @click="$dispatch('open-mileage')"><i data-lucide="car"></i> Indemnité km</button>
+<button class="btn btn-primary btn-sm" x-data @click="$dispatch('open-receipt')"><i data-lucide="plus"></i> Ajouter un reçu</button>
+{% endblock %}
+{% block content %}
+
+<!-- Onglets -->
+{% set tabs = [('receipt','Reçus'),('expense','Frais à rembourser'),('expense_report','Notes de frais')] %}
+<div class="flex items-center gap-2 mb-5 flex-wrap">
+  {% for value, label in tabs %}
+  <a href="/achats?kind={{ value }}" class="chip {% if current_kind == value %}is-active{% endif %}">
+    {{ label }} <span class="ml-1 opacity-70">{{ counts.get(value, 0) }}</span>
+  </a>
+  {% endfor %}
+</div>
+
+<!-- Totaux -->
+<div class="grid grid-cols-2 sm:grid-cols-3 gap-4 mb-5">
+  <div class="card card-pad"><div class="stat-label">Pièces</div><div class="text-2xl font-extrabold mt-1">{{ receipts|length }}</div></div>
+  <div class="card card-pad"><div class="stat-label">Total TTC</div><div class="text-2xl font-extrabold mt-1">{{ money(total_ttc) }} <span class="text-sm muted">MAD</span></div></div>
+  <div class="card card-pad"><div class="stat-label">Total TVA</div><div class="text-2xl font-extrabold mt-1">{{ money(total_tva) }} <span class="text-sm muted">MAD</span></div></div>
+</div>
+
+<div class="card">
+  <div class="overflow-x-auto">
+    <table class="app-table" data-smart data-page-size="20">
+      <thead>
+        <tr>
+          <th>Date dépôt</th><th>Date pièce</th><th>Intitulé</th><th>Compte de pièce</th><th>Banque</th>
+          <th class="text-right">Montant TTC</th><th class="text-right">TVA</th><th>Statut</th><th class="text-right" data-no-sort>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for r in receipts %}
+        <tr>
+          <td class="muted">{{ r.deposit_date.strftime('%d/%m/%Y') }}</td>
+          <td class="muted">{{ r.receipt_date.strftime('%d/%m/%Y') if r.receipt_date else '—' }}</td>
+          <td class="font-semibold">{{ r.label }}</td>
+          <td><span class="badge badge-slate">{{ r.accounting_account or '—' }}</span></td>
+          <td class="muted">{{ banks_by_id.get(r.bank_account_id).name if (r.bank_account_id and banks_by_id.get(r.bank_account_id)) else '—' }}</td>
+          <td class="text-right font-semibold" data-sort="{{ r.amount_ttc }}">{{ money(r.amount_ttc) }}</td>
+          <td class="text-right" data-sort="{{ r.amount_tva }}">{{ money(r.amount_tva) }}</td>
+          <td>
+            <button onclick="toggleValidate(this, {{ r.id }})" class="badge badge-{{ 'green' if r.status == 'validated' else 'amber' }}" style="cursor:pointer;border:0">
+              {{ 'Validé' if r.status == 'validated' else 'À vérifier' }}
+            </button>
+          </td>
+          <td class="text-right whitespace-nowrap">
+            {% if r.journal_entry_id %}
+            <span class="badge badge-green" title="Écriture générée">Comptabilisé</span>
+            {% else %}
+            <button class="btn btn-ghost btn-sm" onclick="comptabiliserAchat(this, {{ r.id }})" title="Comptabiliser"><i data-lucide="book-open-text" style="width:1rem;height:1rem"></i></button>
+            {% endif %}
+            <button class="btn btn-ghost btn-sm text-red-500" onclick="deleteReceipt(this, {{ r.id }})" title="Supprimer"><i data-lucide="trash-2" style="width:1rem;height:1rem"></i></button>
+          </td>
+        </tr>
+      {% else %}
+        <tr data-empty><td colspan="9" class="empty">Aucune pièce dans cet onglet. Cliquez sur « Ajouter un reçu ».</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Modale d'ajout -->
+<div x-data="{ open: false }" @open-receipt.window="open = true" x-show="open" x-cloak class="modal-backdrop" @keydown.escape.window="open=false" style="display:none">
+  <div class="modal-panel max-w-2xl" @click.outside="open = false">
+    <div class="card-header"><h3 class="font-semibold">Ajouter un reçu d'achat</h3>
+      <button @click="open=false" class="btn btn-ghost btn-icon"><i data-lucide="x"></i></button></div>
+    <form method="post" action="/api/accounting/form" class="card-pad grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <input type="hidden" name="kind" value="{{ current_kind }}">
+      <div><label class="label">Date de dépôt</label><input type="date" name="deposit_date" class="input"></div>
+      <div><label class="label">Date de la pièce</label><input type="date" name="receipt_date" class="input"></div>
+      <div class="sm:col-span-2"><label class="label">Intitulé / Fournisseur *</label><input name="label" required class="input" placeholder="ex. ORANGE, GOOGLE, RESTAURANT…"></div>
+      <div class="sm:col-span-2">
+        <label class="label">Fournisseur</label>
+        <select name="supplier_id" class="select">
+          <option value="">— Aucun / ponctuel —</option>
+          {% for f in suppliers %}<option value="{{ f.id }}">{{ f.name }}</option>{% endfor %}
+        </select>
+        <p class="text-xs muted mt-1">Pas dans la liste ? <a href="/fournisseurs" style="color:var(--brand-strong)">Gérer les fournisseurs</a></p>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="label">Compte de pièce</label>
+        <input name="accounting_account" list="acc-list" class="input" placeholder="ex. 6111">
+        <datalist id="acc-list">
+          {% for code, name in accounts %}<option value="{{ code }}">{{ code }} — {{ name }}</option>{% endfor %}
+        </datalist>
+      </div>
+      <div><label class="label">Montant TTC (MAD)</label><input name="amount_ttc" type="number" step="0.01" value="0" class="input"></div>
+      <div><label class="label">TVA (MAD)</label><input name="amount_tva" type="number" step="0.01" value="0" class="input"></div>
+      <div class="sm:col-span-2">
+        <label class="label">Compte bancaire de paiement</label>
+        <select name="bank_account_id" class="select">
+          <option value="">— Aucun —</option>
+          {% for a in bank_accounts %}<option value="{{ a.id }}" {% if default_bank and a.id == default_bank %}selected{% endif %}>{{ a.name }}{% if a.bank_name %} ({{ a.bank_name }}){% endif %}</option>{% endfor %}
+        </select>
+      </div>
+      <div class="sm:col-span-2"><label class="label">Note</label><textarea name="note" rows="2" class="textarea"></textarea></div>
+      <div class="sm:col-span-2 flex justify-end gap-2">
+        <button type="button" @click="open=false" class="btn btn-outline">Annuler</button>
+        <button type="submit" class="btn btn-primary">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modale indemnité kilométrique -->
+<div x-data="{ open:false, km:0, rate:2.5, get amount(){ return (Number(this.km)||0)*(Number(this.rate)||0); }, fmt(n){ return new Intl.NumberFormat('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).format(n||0); } }"
+     @open-mileage.window="open=true" x-show="open" x-cloak class="modal-backdrop" @keydown.escape.window="open=false" style="display:none">
+  <div class="modal-panel max-w-lg" @click.outside="open=false">
+    <div class="card-header"><h3 class="font-semibold">Indemnité kilométrique</h3>
+      <button @click="open=false" class="btn btn-ghost btn-icon"><i data-lucide="x"></i></button></div>
+    <form method="post" action="/api/accounting/mileage" class="card-pad grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div class="sm:col-span-2"><label class="label">Motif du déplacement *</label><input name="motif" required class="input" placeholder="ex. Rendez-vous client Casablanca"></div>
+      <div><label class="label">Date</label><input type="date" name="trip_date" class="input"></div>
+      <div><label class="label">Distance (km)</label><input name="distance_km" type="number" step="0.1" x-model.number="km" required class="input"></div>
+      <div><label class="label">Barème (MAD/km)</label><input name="rate" type="number" step="0.01" x-model.number="rate" class="input"></div>
+      <div class="flex items-end"><div class="text-sm"><span class="muted">Indemnité</span> <b class="text-lg" x-text="fmt(amount) + ' MAD'"></b></div></div>
+      <div class="sm:col-span-2 flex justify-end gap-2">
+        <button type="button" @click="open=false" class="btn btn-outline">Annuler</button>
+        <button type="submit" class="btn btn-primary">Enregistrer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+{% block scripts %}
+<script>
+async function _post(url) {
+  const res = await fetch(url, { method: 'POST', headers: { 'Accept': 'application/json' } });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || ('Erreur ' + res.status));
+  return data;
+}
+async function toggleValidate(btn, id) {
+  try { const d = await _post(`/api/accounting/${id}/validate`);
+    window.toast(d.status === 'validated' ? 'Pièce validée.' : 'Remise à vérifier.', 'success');
+    setTimeout(() => location.reload(), 500);
+  } catch (e) { window.toast('Échec : ' + e.message, 'error'); }
+}
+async function comptabiliserAchat(btn, id) {
+  try { await _post(`/api/accounting/purchases/${id}/post`);
+    window.toast('Reçu comptabilisé (journal des achats).', 'success');
+    setTimeout(() => location.reload(), 700);
+  } catch (e) { window.toast('Échec : ' + e.message, 'error'); }
+}
+async function deleteReceipt(btn, id) {
+  if (!confirm('Supprimer cette pièce ?')) return;
+  try { await _post(`/api/accounting/${id}/delete`); window.toast('Pièce supprimée.', 'success');
+    setTimeout(() => location.reload(), 400);
+  } catch (e) { window.toast('Échec : ' + e.message, 'error'); }
+}
+</script>
+{% endblock %}

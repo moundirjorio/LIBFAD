@@ -1,0 +1,29 @@
+{% extends "portal/base.html" %}
+{% block title %}Nouveau mot de passe — Espace client{% endblock %}
+{% block public_content %}
+<div class="auth-card fade-in">
+  <div class="text-center mb-7">
+    <div class="brand-mark mx-auto mb-4" style="background:var(--grad-brand)"><i data-lucide="lock-keyhole"></i></div>
+    <h1 class="text-2xl font-extrabold tracking-tight">Nouveau mot de passe</h1>
+  </div>
+  {% if error %}
+  <div class="mb-4 p-3 rounded-xl bg-red-50 text-red-700 text-sm border border-red-100 dark:bg-red-500/10 dark:border-red-500/20 dark:text-red-300">{{ error }}</div>
+  {% endif %}
+  {% if valid %}
+  <form method="post" action="/portail/reset-password" class="space-y-4">
+    <input type="hidden" name="token" value="{{ token }}" />
+    <div>
+      <label class="label">Nouveau mot de passe</label>
+      <input name="password" type="password" required minlength="8" autofocus class="input" placeholder="Au moins 8 caractères" />
+    </div>
+    <button type="submit" class="btn btn-primary w-full">Réinitialiser</button>
+  </form>
+  {% else %}
+  <div class="mb-4 p-3 rounded-xl bg-amber-50 text-amber-700 text-sm border border-amber-100 dark:bg-amber-500/10 dark:border-amber-500/20 dark:text-amber-300">
+    Ce lien est invalide ou expiré.
+  </div>
+  <a href="/portail/forgot-password" class="btn btn-primary w-full">Demander un nouveau lien</a>
+  {% endif %}
+  <p class="text-center text-sm muted mt-6"><a href="/portail/login" class="font-semibold hover:underline" style="color:var(--brand-strong)">Retour à la connexion</a></p>
+</div>
+{% endblock %}

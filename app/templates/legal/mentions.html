@@ -1,0 +1,27 @@
+{% extends "legal/base.html" %}
+{% block body %}
+<h2>Éditeur du service</h2>
+<p>Le service <strong>{{ company.product }}</strong> est édité par <strong>{{ company.name }}</strong>,
+au capital de {{ company.capital }}.</p>
+<ul>
+  <li>Siège social : {{ company.address }}</li>
+  <li>RC : {{ company.rc }}</li>
+  <li>ICE : {{ company.ice }}</li>
+  <li>CNSS : {{ company.cnss }}</li>
+  <li>Email : <a href="mailto:{{ company.email }}">{{ company.email }}</a></li>
+</ul>
+
+<h2>Directeur de la publication</h2>
+<p>Le représentant légal de {{ company.name }}.</p>
+
+<h2>Hébergement</h2>
+<p>{{ company.host }}</p>
+
+<h2>Propriété intellectuelle</h2>
+<p>L'ensemble des éléments du service {{ company.product }} (marques, logos, textes, interfaces,
+code) est protégé par le droit de la propriété intellectuelle et demeure la propriété exclusive
+de l'éditeur, sauf mention contraire.</p>
+
+<h2>Contact</h2>
+<p>Pour toute question : <a href="mailto:{{ company.email }}">{{ company.email }}</a>.</p>
+{% endblock %}

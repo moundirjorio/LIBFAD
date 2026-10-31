@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+{% block title %}Produits & Services — LIBFAD{% endblock %}
+{% block heading %}Produits & Services{% endblock %}
+{% block header_extra %}
+<button x-data @click="$dispatch('open-product-modal')" class="btn btn-primary btn-sm">+ Nouveau produit</button>
+{% endblock %}
+
+{% block content %}
+{% from "components/ui.html" import page_header %}
+{{ page_header('Produits et services', 'Construisez un catalogue clair pour facturer plus rapidement.', 'package') }}
+<div class="card">
+  <div class="overflow-x-auto">
+    <table class="app-table" data-smart data-page-size="15">
+      <thead>
+        <tr>
+          <th>Nom</th><th>Réf.</th><th>Type</th><th class="text-right">PU HT</th><th>Unité</th><th>TVA</th><th class="text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+      {% for p in products %}
+        <tr>
+          <td>
+            <span class="font-medium">{{ p.name }}</span>
+            {% if p.description %}<p class="text-xs muted truncate max-w-xs">{{ p.description }}</p>{% endif %}
+          </td>
+          <td class="muted">{{ p.sku or '—' }}</td>
+          <td><span class="badge badge-{{ 'indigo' if p.kind == 'product' else 'slate' }}">{{ 'Produit' if p.kind == 'product' else 'Service' }}</span></td>
+          <td class="text-right font-medium">{{ p.unit_price | round(2) }}</td>
+          <td class="muted">{{ p.unit }}</td>
+          <td class="muted">{{ tax_rates_by_id.get(p.tax_rate_id).rate ~ '%' if p.tax_rate_id and tax_rates_by_id.get(p.tax_rate_id) else '—' }}</td>
+          <td class="text-right">
+            <form method="post" action="/api/products/{{ p.id }}/delete-form" onsubmit="return confirm('Supprimer ce produit ?');" class="inline">
+              <button type="submit" class="btn btn-ghost btn-sm text-red-500">Supprimer</button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="empty">Aucun produit. Ajoutez votre premier produit ou service.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div x-data="{ open: false }" x-cloak @open-product-modal.window="open = true" x-show="open" class="modal-backdrop" @keydown.escape.window="open = false">
+  <div class="modal-panel max-w-2xl p-6" @click.outside="open = false">
+    <div class="flex items-center justify-between mb-5">
+      <h2 class="text-lg font-semibold">Nouveau produit / service</h2>
+      <button @click="open = false" class="btn btn-ghost btn-icon">&times;</button>
+    </div>
+    <form method="post" action="/api/products/form" class="grid grid-cols-2 gap-4">
+      <div class="col-span-2"><label class="label">Nom *</label><input name="name" required class="input" /></div>
+      <div><label class="label">Référence (SKU)</label><input name="sku" class="input" /></div>
+      <div><label class="label">Type</label>
+        <select name="kind" class="select"><option value="service">Service</option><option value="product">Produit</option></select></div>
+      <div><label class="label">Prix unitaire HT</label><input name="unit_price" type="number" step="0.01" min="0" value="0" class="input" /></div>
+      <div><label class="label">Unité</label><input name="unit" value="u" class="input" /></div>
+      <div class="col-span-2"><label class="label">TVA</label>
+        <select name="tax_rate_id" class="select">
+          <option value="">— Aucune —</option>
+          {% for tr in tax_rates %}<option value="{{ tr.id }}">{{ tr.name }} ({{ tr.rate }}%)</option>{% endfor %}
+        </select></div>
+      <div class="col-span-2"><label class="label">Description</label><textarea name="description" rows="2" class="textarea"></textarea></div>
+      <div class="col-span-2 flex justify-end gap-2 mt-2">
+        <button type="button" @click="open = false" class="btn btn-outline">Annuler</button>
+        <button type="submit" class="btn btn-primary">Créer</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
